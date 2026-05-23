@@ -45,7 +45,7 @@ Label        = bucket(Total) → Exceptional / Very Strong / Strong / Watchlist 
 
 `getSignalScoreBreakdown()` and `getTrackRecordBreakdown()` are exported for `ScoreBreakdown.tsx` — they recompute subscores on demand rather than storing them on `ComputedSignal`.
 
-Live EDGAR entries use neutral track record defaults (`historicalAlpha: 5.0`, `winRate: 52`, `tradeCount: 5`, `recentPerformance: "Neutral"`) because historical performance data is not available from EDGAR alone — planned for Version 3.
+Live EDGAR and Congress entries use neutral track record defaults (`historicalAlpha: 5.0`, `winRate: 52`, `tradeCount: 5`, `recentPerformance: "Neutral recent performance"`) because historical performance data requires a separate price-history source — planned for Version 4.
 
 ### Committee data (`src/data/committees.ts`)
 
@@ -110,7 +110,7 @@ Page files (`app/*/page.tsx`) are server components — `dashboard/page.tsx` is 
 ## Deployment
 
 - Vercel auto-deploys on every push to `main` (repo must be **public** — Hobby plan blocks deploys from non-member commit authors on private repos).
-- `.github/workflows/daily-rebuild.yml` triggers a Vercel deploy hook every day at 07:00 UTC, refreshing live EDGAR data. The hook URL is stored as the GitHub secret `VERCEL_DEPLOY_HOOK_URL`.
+- `.github/workflows/daily-rebuild.yml` triggers a Vercel deploy hook every day at 07:00 UTC, refreshing live EDGAR and Congress data. The hook URL is stored as the GitHub secret `VERCEL_DEPLOY_HOOK_URL`.
 
 ## Version scope
 
