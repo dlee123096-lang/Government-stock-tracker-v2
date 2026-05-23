@@ -43,7 +43,7 @@ export default async function DashboardPage() {
           </span>
         </div>
       </div>
-      <DashboardClient signals={signals} />
+      <DashboardClient signals={signals} isLive={isLive} lastUpdated={lastUpdated} />
     </div>
   );
 }

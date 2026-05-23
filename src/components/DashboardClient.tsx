@@ -10,9 +10,15 @@ import SummaryCards from "./SummaryCards";
 
 interface DashboardClientProps {
   signals: ComputedSignal[];
+  isLive: boolean;
+  lastUpdated: string;
 }
 
-export default function DashboardClient({ signals }: DashboardClientProps) {
+export default function DashboardClient({
+  signals,
+  isLive,
+  lastUpdated,
+}: DashboardClientProps) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
   const filtered = useMemo(
@@ -21,8 +27,8 @@ export default function DashboardClient({ signals }: DashboardClientProps) {
   );
 
   return (
-    <div className="space-y-6">
-      <SummaryCards signals={filtered} />
+    <div className="space-y-5">
+      <SummaryCards signals={filtered} isLive={isLive} lastUpdated={lastUpdated} />
       <FilterBar filters={filters} onFiltersChange={setFilters} />
       <SignalTable signals={filtered} />
     </div>

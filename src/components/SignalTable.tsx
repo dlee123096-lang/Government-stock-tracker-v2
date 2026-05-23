@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { ComputedSignal } from "@/types/signal";
 import type { SortDirection, SortKey } from "@/lib/utils";
 import { formatCurrency, formatDate, sortSignals } from "@/lib/utils";
@@ -19,11 +19,11 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { key: "static", label: "Rank", sortable: false },
+  { key: "static", label: "#", sortable: false },
   { key: "static", label: "Ticker / Company", sortable: false },
-  { key: "static", label: "Signal", sortable: false },
+  { key: "static", label: "Source", sortable: false },
   { key: "static", label: "Person / Role", sortable: false },
-  { key: "static", label: "Trade", sortable: false },
+  { key: "static", label: "Action", sortable: false },
   { key: "tradeSize", label: "Size", sortable: true, align: "right" },
   { key: "filingDate", label: "Filed", sortable: true },
   { key: "signalScore", label: "Signal", sortable: true, align: "right" },
@@ -35,16 +35,33 @@ const COLUMNS: Column[] = [
   },
   {
     key: "totalOpportunityScore",
-    label: "Total",
+    label: "Score",
     sortable: true,
     align: "right",
   },
-  { key: "static", label: "Label", sortable: false },
+  { key: "static", label: "Rating", sortable: false },
 ];
+
+// Stable fallback explanation built from signal data
+function buildExplanation(s: ComputedSignal): string {
+  return (
+    `${s.tradeType} of ${formatCurrency(s.tradeSize)} in ${s.ticker} by ${s.personEntity} (${s.role}). ` +
+    `Signal subtype "${s.signalSubtype}" scored ${s.signalScore}/100 for signal strength; ` +
+    `track record scored ${s.trackRecordScore}/100. ` +
+    `Filing was ${s.daysDelayed} day${s.daysDelayed === 1 ? "" : "s"} after the trade date.` +
+    (s.contextTags.length > 0
+      ? ` Context bonuses: ${s.contextTags.join(", ")}.`
+      : "") +
+    (s.riskFlags.length > 0
+      ? ` Risk flags: ${s.riskFlags.join(", ")}.`
+      : "")
+  );
+}
 
 export default function SignalTable({ signals }: SignalTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("totalOpportunityScore");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const sorted = useMemo(
     () => sortSignals(signals, sortKey, sortDir),
@@ -60,10 +77,14 @@ export default function SignalTable({ signals }: SignalTableProps) {
     }
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
   if (signals.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center text-gray-500">
-        No signals match your filters.
+      <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400 shadow-sm">
+        No disclosures match your filters.
       </div>
     );
   }
@@ -71,14 +92,14 @@ export default function SignalTable({ signals }: SignalTableProps) {
   return (
     <>
       {/* Desktop table */}
-      <div className="hidden md:block bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+      <div className="hidden md:block bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="border-b border-slate-100">
             <tr>
               {COLUMNS.map((col, i) => (
                 <th
                   key={i}
-                  className={`px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide ${
+                  className={`px-3 py-3 text-xs font-semibold text-slate-400 uppercase tracking-widest ${
                     col.align === "right" ? "text-right" : "text-left"
                   }`}
                 >
@@ -86,130 +107,225 @@ export default function SignalTable({ signals }: SignalTableProps) {
                     <button
                       type="button"
                       onClick={() => handleSort(col.key as SortKey)}
-                      className="inline-flex items-center gap-1 hover:text-gray-900"
+                      className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors"
                     >
                       {col.label}
-                      {sortKey === col.key && (
-                        <span aria-hidden>
-                          {sortDir === "desc" ? "↓" : "↑"}
-                        </span>
-                      )}
+                      <span
+                        aria-hidden
+                        className={
+                          sortKey === col.key ? "text-blue-500" : "opacity-0"
+                        }
+                      >
+                        {sortDir === "desc" ? "↓" : "↑"}
+                      </span>
                     </button>
                   ) : (
                     col.label
                   )}
                 </th>
               ))}
+              {/* Expand column header */}
+              <th className="w-8" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-50">
             {sorted.map((s, idx) => (
-              <tr
-                key={s.id}
-                className="hover:bg-blue-50 transition-colors"
-              >
-                <td className="px-3 py-3 text-gray-500 font-medium">
-                  {idx + 1}
-                </td>
-                <td className="px-3 py-3">
-                  <Link
-                    href={`/signal/${s.id}`}
-                    className="block hover:text-blue-600"
-                  >
-                    <div className="font-semibold text-gray-900">{s.ticker}</div>
-                    <div className="text-xs text-gray-500 truncate max-w-[180px]">
-                      {s.company}
-                    </div>
-                  </Link>
-                </td>
-                <td className="px-3 py-3 text-gray-700 text-xs">
-                  {s.signalType}
-                </td>
-                <td className="px-3 py-3">
-                  <div className="text-gray-900">{s.personEntity}</div>
-                  <div className="text-xs text-gray-500">{s.role}</div>
-                </td>
-                <td className="px-3 py-3">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      s.tradeType === "Buy"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {s.tradeType}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-right text-gray-900 font-medium tabular-nums">
-                  {formatCurrency(s.tradeSize)}
-                </td>
-                <td className="px-3 py-3 text-gray-700 whitespace-nowrap">
-                  {formatDate(s.filingDate)}
-                </td>
-                <td className="px-3 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                  {s.signalScore}
-                </td>
-                <td className="px-3 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                  {s.trackRecordScore}
-                </td>
-                <td className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums">
-                  {s.totalOpportunityScore}
-                </td>
-                <td className="px-3 py-3">
-                  <ScoreBadge label={s.label} />
-                </td>
-              </tr>
+              <Fragment key={s.id}>
+                <tr
+                  className={`hover:bg-slate-50 transition-colors ${
+                    expandedId === s.id ? "bg-slate-50" : ""
+                  }`}
+                >
+                  <td className="px-3 py-3.5 text-slate-400 font-medium text-xs">
+                    {idx + 1}
+                  </td>
+                  <td className="px-3 py-3.5">
+                    <Link
+                      href={`/signal/${s.id}`}
+                      className="block group"
+                    >
+                      <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        {s.ticker}
+                      </div>
+                      <div className="text-xs text-slate-400 truncate max-w-[160px] mt-0.5">
+                        {s.company}
+                      </div>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-3.5 text-slate-500 text-xs whitespace-nowrap">
+                    {s.signalType}
+                  </td>
+                  <td className="px-3 py-3.5">
+                    <div className="text-slate-800 text-sm">{s.personEntity}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{s.role}</div>
+                  </td>
+                  <td className="px-3 py-3.5">
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
+                        s.tradeType === "Buy"
+                          ? "bg-blue-50 text-blue-700 ring-blue-100"
+                          : "bg-slate-100 text-slate-600 ring-slate-200"
+                      }`}
+                    >
+                      {s.tradeType}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3.5 text-right text-slate-800 font-medium tabular-nums text-sm">
+                    {formatCurrency(s.tradeSize)}
+                  </td>
+                  <td className="px-3 py-3.5 text-slate-500 text-xs whitespace-nowrap">
+                    {formatDate(s.filingDate)}
+                  </td>
+                  <td className="px-3 py-3.5 text-right tabular-nums text-slate-700 font-medium text-sm">
+                    {s.signalScore}
+                  </td>
+                  <td className="px-3 py-3.5 text-right tabular-nums text-slate-700 font-medium text-sm">
+                    {s.trackRecordScore}
+                  </td>
+                  <td className="px-3 py-3.5 text-right tabular-nums font-bold text-slate-900 text-sm">
+                    {s.totalOpportunityScore}
+                  </td>
+                  <td className="px-3 py-3.5">
+                    <ScoreBadge label={s.label} />
+                  </td>
+                  {/* Expand toggle */}
+                  <td className="px-2 py-3.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(s.id)}
+                      aria-label={
+                        expandedId === s.id ? "Collapse" : "View details"
+                      }
+                      className="text-slate-300 hover:text-blue-500 transition-colors text-xs leading-none px-1"
+                    >
+                      {expandedId === s.id ? "▲" : "▾"}
+                    </button>
+                  </td>
+                </tr>
+
+                {/* Expandable explanation row */}
+                {expandedId === s.id && (
+                  <tr key={`${s.id}-expand`} className="bg-slate-50">
+                    <td
+                      colSpan={12}
+                      className="px-5 py-4 border-b border-slate-100"
+                    >
+                      <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">
+                        {s.explanation ?? buildExplanation(s)}
+                      </p>
+                      <div className="mt-2 flex items-center gap-4">
+                        <Link
+                          href={`/signal/${s.id}`}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Full score breakdown →
+                        </Link>
+                        <span className="text-xs text-slate-400">
+                          {s.signalType} · Filed {formatDate(s.filingDate)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
+
+        {/* Table footer disclaimer */}
+        <div className="px-4 py-3 border-t border-slate-100 text-xs text-slate-400">
+          Educational tool only — not financial advice. Data from public disclosures (SEC EDGAR, STOCK Act).
+        </div>
       </div>
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
         {sorted.map((s, idx) => (
-          <Link
+          <div
             key={s.id}
-            href={`/signal/${s.id}`}
-            className="block bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:border-blue-300 transition-colors"
+            className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
           >
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">#{idx + 1}</span>
-                  <span className="font-bold text-gray-900">{s.ticker}</span>
+            <div className="p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">#{idx + 1}</span>
+                    <Link
+                      href={`/signal/${s.id}`}
+                      className="font-bold text-slate-900 hover:text-blue-600 transition-colors"
+                    >
+                      {s.ticker}
+                    </Link>
+                    <span
+                      className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ring-1 ${
+                        s.tradeType === "Buy"
+                          ? "bg-blue-50 text-blue-700 ring-blue-100"
+                          : "bg-slate-100 text-slate-600 ring-slate-200"
+                      }`}
+                    >
+                      {s.tradeType}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">{s.company}</div>
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">{s.company}</div>
+                <ScoreBadge label={s.label} />
               </div>
-              <ScoreBadge label={s.label} />
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div className="text-xs text-slate-400">Signal</div>
+                  <div className="font-semibold text-slate-800 tabular-nums">
+                    {s.signalScore}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">Track Rec.</div>
+                  <div className="font-semibold text-slate-800 tabular-nums">
+                    {s.trackRecordScore}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">Total</div>
+                  <div className="font-bold text-slate-900 tabular-nums">
+                    {s.totalOpportunityScore}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
+                <span>{s.personEntity}</span>
+                <span>{formatDate(s.filingDate)}</span>
+              </div>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <div className="text-xs text-gray-500">Signal</div>
-                <div className="font-semibold text-gray-900">
-                  {s.signalScore}
+
+            {/* Mobile expand */}
+            <div className="border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => toggleExpand(s.id)}
+                className="w-full px-4 py-2.5 text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-colors flex items-center justify-between"
+              >
+                <span>{expandedId === s.id ? "Hide details" : "View details"}</span>
+                <span aria-hidden>{expandedId === s.id ? "▲" : "▾"}</span>
+              </button>
+              {expandedId === s.id && (
+                <div className="px-4 pb-4 text-xs text-slate-600 leading-relaxed">
+                  <p>{s.explanation ?? buildExplanation(s)}</p>
+                  <Link
+                    href={`/signal/${s.id}`}
+                    className="mt-2 inline-block text-blue-600 font-medium hover:underline"
+                  >
+                    Full score breakdown →
+                  </Link>
                 </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">Track Rec.</div>
-                <div className="font-semibold text-gray-900">
-                  {s.trackRecordScore}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">Total</div>
-                <div className="font-bold text-gray-900">
-                  {s.totalOpportunityScore}
-                </div>
-              </div>
+              )}
             </div>
-            <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 flex justify-between">
-              <span>
-                {s.tradeType} • {formatCurrency(s.tradeSize)}
-              </span>
-              <span>{formatDate(s.filingDate)}</span>
-            </div>
-          </Link>
+          </div>
         ))}
+
+        <p className="text-xs text-center text-slate-400 pt-2 pb-1">
+          Educational tool only — not financial advice.
+        </p>
       </div>
     </>
   );

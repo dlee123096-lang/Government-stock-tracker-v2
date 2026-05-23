@@ -8,7 +8,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="max-w-3xl">
             <div className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold mb-4 ring-1 ring-blue-200">
-              SignalAlpha · Version 1 (sample data)
+              SignalAlpha · Version 3 · Live SEC &amp; STOCK Act data
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
               Track public market disclosures.{" "}

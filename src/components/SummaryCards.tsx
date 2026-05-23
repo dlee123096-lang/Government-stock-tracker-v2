@@ -1,54 +1,98 @@
 import type { ComputedSignal } from "@/types/signal";
-import { topSignalType } from "@/lib/utils";
 
 interface SummaryCardsProps {
   signals: ComputedSignal[];
+  isLive: boolean;
+  lastUpdated: string;
 }
 
-interface Card {
-  label: string;
-  value: string;
-}
-
-export default function SummaryCards({ signals }: SummaryCardsProps) {
+export default function SummaryCards({
+  signals,
+  isLive,
+  lastUpdated,
+}: SummaryCardsProps) {
   const total = signals.length;
-  const avgSignal =
-    total === 0
-      ? 0
-      : signals.reduce((s, x) => s + x.signalScore, 0) / total;
-  const avgTrack =
-    total === 0
-      ? 0
-      : signals.reduce((s, x) => s + x.trackRecordScore, 0) / total;
-  const strongCount = signals.filter(
-    (s) =>
-      s.label === "Exceptional Signal" || s.label === "Very Strong Signal",
-  ).length;
-  const top = topSignalType(signals);
 
-  const cards: Card[] = [
-    { label: "Total Signals Tracked", value: total.toString() },
-    { label: "Avg Signal Score", value: avgSignal.toFixed(1) },
-    { label: "Avg Track Record Score", value: avgTrack.toFixed(1) },
-    { label: "Very Strong / Exceptional", value: strongCount.toString() },
-    { label: "Top Signal Type", value: top },
-  ];
+  const latestFiling =
+    total === 0
+      ? "—"
+      : new Date(
+          Math.max(...signals.map((s) => new Date(s.filingDate).getTime())),
+        ).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+
+  const topScore =
+    total === 0
+      ? "—"
+      : Math.max(...signals.map((s) => s.totalOpportunityScore)).toString();
+
+  const updatedAt = new Date(lastUpdated).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-      {cards.map((c) => (
-        <div
-          key={c.label}
-          className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
-        >
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-            {c.label}
-          </div>
-          <div className="mt-2 text-2xl font-bold text-gray-900 truncate">
-            {c.value}
-          </div>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Disclosures */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+          Disclosures
         </div>
-      ))}
+        <div className="mt-2 text-3xl font-bold text-slate-800 tabular-nums">
+          {total}
+        </div>
+        <div className="mt-1 text-xs text-slate-400">matching current filters</div>
+      </div>
+
+      {/* Latest Filing */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+          Latest Filing
+        </div>
+        <div className="mt-2 text-xl font-bold text-slate-800 leading-tight">
+          {latestFiling}
+        </div>
+        <div className="mt-1 text-xs text-slate-400">most recent in view</div>
+      </div>
+
+      {/* Top Score */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+          Top Score
+        </div>
+        <div className="mt-2 text-3xl font-bold text-slate-800 tabular-nums">
+          {topScore}
+        </div>
+        <div className="mt-1 text-xs text-slate-400">highest opportunity score</div>
+      </div>
+
+      {/* Data Status */}
+      <div
+        className={`border rounded-xl p-4 shadow-sm ${
+          isLive
+            ? "bg-white border-slate-200"
+            : "bg-white border-slate-200"
+        }`}
+      >
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+          Data Source
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+              isLive ? "bg-emerald-500" : "bg-amber-400"
+            }`}
+          />
+          <span className="text-sm font-semibold text-slate-800">
+            {isLive ? "Live · SEC EDGAR" : "Sample data"}
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-slate-400">refreshed {updatedAt}</div>
+      </div>
     </div>
   );
 }
