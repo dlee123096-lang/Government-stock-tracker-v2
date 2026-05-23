@@ -15,14 +15,15 @@ There are no tests. `npm run build` is the verification step before every commit
 
 ## Architecture
 
-### Data pipeline (two modes)
+### Data pipeline (two live sources + fallback)
 
-At build time, `src/app/dashboard/page.tsx` calls `getSignals()` from `src/data/liveSignals.ts`, which:
+At build/request time, `src/app/dashboard/page.tsx` calls `getSignals()` from `src/data/liveSignals.ts`, which runs two sources concurrently via `Promise.allSettled`:
 
-1. **Live mode** — calls `fetchEdgarSignals()` from `src/lib/edgar.ts`, which fetches real SEC Form 4 filings for 16 watched companies via the EDGAR Submissions API (`data.sec.gov/submissions/CIK{cik}.json`), then fetches and regex-parses each filing's XML. Returns `SignalEntry[]`. If ≥5 entries come back, `isLive: true`.
-2. **Fallback mode** — if EDGAR returns fewer than 5 entries or throws, falls back to `computedSignals` from `src/data/mockSignals.ts`. `isLive: false`.
+1. **EDGAR** — `fetchEdgarSignals()` in `src/lib/edgar.ts` fetches real SEC Form 4 filings for 16 watched companies. Returns `SignalEntry[]` with `signalType: "Corporate Insider"`.
+2. **Congress** — `fetchCongressSignals()` in `src/lib/congress.ts` hits the Senate eFD API (`efts.senate.gov/v1/filings?filing_type=PT`) for Periodic Transaction Reports; fetches individual filing details for up to 15 recent filings and parses transaction JSON. Returns `SignalEntry[]` with `signalType: "Government Official"`.
+3. **Fallback** — if combined results < 5 entries, falls back to `computedSignals` from `src/data/mockSignals.ts`. `isLive: false`. One source failing never kills the other.
 
-The dashboard page passes `{ signals, lastUpdated, isLive }` down. `lastUpdated` is `new Date().toISOString()` captured at build time and rendered in the dashboard header as a live/sample badge + timestamp.
+The dashboard page passes `{ signals, lastUpdated, isLive }` down. `lastUpdated` is `new Date().toISOString()` captured at build/request time and rendered in the dashboard header as a live/sample badge + timestamp.
 
 ### Scoring engine (`src/lib/scoring.ts`)
 
@@ -45,6 +46,35 @@ Label        = bucket(Total) → Exceptional / Very Strong / Strong / Watchlist 
 `getSignalScoreBreakdown()` and `getTrackRecordBreakdown()` are exported for `ScoreBreakdown.tsx` — they recompute subscores on demand rather than storing them on `ComputedSignal`.
 
 Live EDGAR entries use neutral track record defaults (`historicalAlpha: 5.0`, `winRate: 52`, `tradeCount: 5`, `recentPerformance: "Neutral"`) because historical performance data is not available from EDGAR alone — planned for Version 3.
+
+### Committee data (`src/data/committees.ts`)
+
+Pure static data — no imports. Contains:
+- `COMMITTEE_SECTOR_MAP` — maps committee names to tickers they directly oversee (e.g., "Senate Intelligence" → ["NVDA", "PLTR", ...]).
+- `OFFICIALS` — maps 27 real senator/representative names to `OfficialInfo` (chamber, state, committees, title).
+- `getCommitteeRelevance(officialName, ticker)` — returns `["Sector relevance to committee"]` if the official's committees cover that ticker; drives the +4 context bonus in scoring.
+- `officialSubtype(officialName, ticker, tradeType)` — returns the correct `signalSubtype` string for scoring (`"Relevant committee trade"`, `"Large congressional purchase"`, or `"Government official sell"`).
+
+Names in `OFFICIALS` must exactly match the `personEntity` strings returned by `fetchCongressSignals()` and used in mock data.
+
+### Congress client (`src/lib/congress.ts`)
+
+- Senate eFD list endpoint: `https://efts.senate.gov/v1/filings?filing_type=PT&limit=100&date_fld_from={cutoff}` (60-day lookback).
+- Individual filing detail: `https://efts.senate.gov/v1/filings/{id}` — looks for `transactions[]` array with `asset_description`, `transaction_type`, `amount`, `transaction_date`.
+- Ticker extraction: Senate filings often include ticker in parentheses, e.g. `"Apple Inc. (AAPL)"` — regex `\(([A-Z]{1,5})\)`.
+- Amount parsing: STOCK Act reports ranges (`"$15,001 - $50,000"`) — `parseStockActAmount()` takes the midpoint.
+- Caps at 15 filings per build with 150ms delay to avoid rate limits.
+- Returns `[]` on any error; `Promise.allSettled` in `liveSignals.ts` ensures one source failing doesn't break the other.
+
+### Official profile pages (`src/app/official/[name]/page.tsx`)
+
+URL slug: `official-name.toLowerCase().replace(/\s+/g, "-")` (e.g., `nancy-pelosi`).
+`generateStaticParams()` pre-generates pages for all names in `OFFICIALS`.
+Page body does a normalized slug comparison (not naive `split("-").map(capitalize)`) to correctly handle mixed-case names like "McHenry".
+
+### Signal detail page (`src/app/signal/[id]/page.tsx`)
+
+Now `async`. Fast path: checks `mockComputedSignals` first (pre-generated at build time). If the ID is not in mock data (i.e., it's a live EDGAR or Congress signal), falls through to `await getSignals()` and looks up by id. Government official signals show a committee assignments panel and a link to `/official/[name]`.
 
 ### EDGAR client (`src/lib/edgar.ts`)
 
@@ -85,5 +115,6 @@ Page files (`app/*/page.tsx`) are server components — `dashboard/page.tsx` is 
 ## Version scope
 
 - **V1**: mock data only (`src/data/mockSignals.ts`)
-- **V2**: live EDGAR Form 4 insider data (`src/lib/edgar.ts` + `src/data/liveSignals.ts`) ← current
-- **V3–V5**: Congress STOCK Act, 13F/13D hedge fund data, historical price performance, watchlists — documented in `README.md`. Do not implement without explicit instruction.
+- **V2**: live EDGAR Form 4 insider data (`src/lib/edgar.ts` + `src/data/liveSignals.ts`)
+- **V3**: Congress STOCK Act disclosures via Senate eFD API + committee relevance scoring + official profile pages ← current
+- **V4–V5**: 13F/13D hedge fund data, historical price performance, watchlists — documented in `README.md`. Do not implement without explicit instruction.
