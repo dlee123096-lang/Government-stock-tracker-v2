@@ -31,6 +31,12 @@ export default function Header() {
             >
               Dashboard
             </Link>
+            <Link
+              href="/officials"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              Officials
+            </Link>
           </nav>
 
           <button
@@ -79,6 +85,13 @@ export default function Header() {
               className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/officials"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Officials
             </Link>
           </nav>
         )}
