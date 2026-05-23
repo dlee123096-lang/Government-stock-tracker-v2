@@ -2,20 +2,44 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ScoreBadge from "@/components/ScoreBadge";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
-import { computedSignals } from "@/data/mockSignals";
+import { computedSignals as mockComputedSignals } from "@/data/mockSignals";
+import { getSignals } from "@/data/liveSignals";
+import { OFFICIALS } from "@/data/committees";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { ComputedSignal } from "@/types/signal";
 
+// Pre-generate detail pages for the static mock signals at build time.
+// Live signal pages (EDGAR / Congress) render dynamically on demand.
 export function generateStaticParams() {
-  return computedSignals.map((s) => ({ id: s.id }));
+  return mockComputedSignals.map((s) => ({ id: s.id }));
 }
 
 interface PageProps {
   params: { id: string };
 }
 
-export default function SignalDetailPage({ params }: PageProps) {
-  const signal = computedSignals.find((s) => s.id === params.id);
+export default async function SignalDetailPage({ params }: PageProps) {
+  // Fast path: check mock signals first
+  const mockSignal = mockComputedSignals.find((s) => s.id === params.id);
+
+  let signal: ComputedSignal | undefined = mockSignal;
+
+  if (!signal) {
+    // Live signal: fetch all current data and find by id
+    const { signals } = await getSignals();
+    signal = signals.find((s) => s.id === params.id);
+  }
+
   if (!signal) notFound();
+
+  const officialInfo =
+    signal.signalType === "Government Official"
+      ? OFFICIALS[signal.personEntity]
+      : undefined;
+
+  const officialSlug = signal.personEntity
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 
   const defaultExplanation =
     `This ${signal.signalType.toLowerCase()} signal was rated "${signal.label}" based on a ` +
@@ -64,7 +88,15 @@ export default function SignalDetailPage({ params }: PageProps) {
         </div>
 
         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-100">
-          <DetailField label="Person / Entity" value={signal.personEntity} />
+          <DetailField
+            label="Person / Entity"
+            value={signal.personEntity}
+            href={
+              signal.signalType === "Government Official"
+                ? `/official/${officialSlug}`
+                : undefined
+            }
+          />
           <DetailField label="Role" value={signal.role} />
           <DetailField
             label="Trade"
@@ -89,6 +121,33 @@ export default function SignalDetailPage({ params }: PageProps) {
           />
         </div>
       </div>
+
+      {/* Committee info for government officials */}
+      {officialInfo && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-5 shadow-sm">
+          <h3 className="font-semibold text-blue-900 mb-2">
+            Committee Assignments
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {officialInfo.committees.map((committee) => (
+              <span
+                key={committee}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ring-1 ring-blue-200"
+              >
+                {committee}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-blue-700">
+            <Link
+              href={`/official/${officialSlug}`}
+              className="underline hover:text-blue-900"
+            >
+              View official profile →
+            </Link>
+          </p>
+        </div>
+      )}
 
       {/* Context tags & risk flags */}
       {(signal.contextTags.length > 0 || signal.riskFlags.length > 0) && (
@@ -145,21 +204,39 @@ export default function SignalDetailPage({ params }: PageProps) {
 
       {/* Disclaimer */}
       <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900 leading-relaxed">
-        <span className="font-semibold">Disclaimer:</span> This is sample/mock
-        data for demonstration purposes only. Not financial advice. Always do
-        your own research before making investment decisions.
+        <span className="font-semibold">Disclaimer:</span> This is an
+        educational tool. Data sourced from public disclosures (SEC EDGAR Form
+        4, STOCK Act). Not financial advice. Always do your own research before
+        making investment decisions.
       </div>
     </div>
   );
 }
 
-function DetailField({ label, value }: { label: string; value: string }) {
+function DetailField({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: string;
+  href?: string;
+}) {
   return (
     <div>
       <div className="text-xs uppercase tracking-wide text-gray-500">
         {label}
       </div>
-      <div className="mt-1 font-medium text-gray-900 text-sm">{value}</div>
+      {href ? (
+        <Link
+          href={href}
+          className="mt-1 font-medium text-blue-600 hover:text-blue-800 text-sm underline block"
+        >
+          {value}
+        </Link>
+      ) : (
+        <div className="mt-1 font-medium text-gray-900 text-sm">{value}</div>
+      )}
     </div>
   );
 }

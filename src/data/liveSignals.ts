@@ -1,5 +1,6 @@
 import { computeFullSignal } from "@/lib/scoring";
 import { fetchEdgarSignals } from "@/lib/edgar";
+import { fetchCongressSignals } from "@/lib/congress";
 import type { ComputedSignal } from "@/types/signal";
 import { computedSignals as mockSignals } from "./mockSignals";
 
@@ -12,25 +13,37 @@ export interface SignalDataResult {
 export async function getSignals(): Promise<SignalDataResult> {
   const lastUpdated = new Date().toISOString();
 
-  try {
-    const edgarEntries = await fetchEdgarSignals();
+  // Run both sources concurrently; one failing doesn't kill the other
+  const [edgarResult, congressResult] = await Promise.allSettled([
+    fetchEdgarSignals(),
+    fetchCongressSignals(),
+  ]);
 
-    if (edgarEntries.length >= 5) {
-      return {
-        signals: edgarEntries.map(computeFullSignal),
-        lastUpdated,
-        isLive: true,
-      };
-    }
+  const edgarEntries =
+    edgarResult.status === "fulfilled" ? edgarResult.value : [];
+  const congressEntries =
+    congressResult.status === "fulfilled" ? congressResult.value : [];
 
-    // Fewer than 5 live entries means EDGAR returned very little — fall back
-    console.warn(
-      `EDGAR returned only ${edgarEntries.length} entries. Using mock data.`,
-    );
-  } catch (err) {
-    console.error("EDGAR fetch failed — using mock data:", err);
+  if (edgarResult.status === "rejected") {
+    console.error("EDGAR fetch failed:", edgarResult.reason);
+  }
+  if (congressResult.status === "rejected") {
+    console.error("Congress fetch failed:", congressResult.reason);
   }
 
+  const allEntries = [...edgarEntries, ...congressEntries];
+
+  if (allEntries.length >= 5) {
+    return {
+      signals: allEntries.map(computeFullSignal),
+      lastUpdated,
+      isLive: true,
+    };
+  }
+
+  console.warn(
+    `Live sources returned only ${allEntries.length} entries — using mock data.`,
+  );
   return {
     signals: mockSignals,
     lastUpdated,
