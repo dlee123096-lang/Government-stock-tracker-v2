@@ -5,33 +5,33 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "SignalAlpha — Public Market Disclosure Tracker",
-    template: "%s | SignalAlpha",
+    default: "Signal Alpha | Congress Stock Trade Tracker & STOCK Act Disclosure Dashboard",
+    template: "%s | Signal Alpha Stock",
   },
   description:
-    "Track and score insider trades, congressional STOCK Act disclosures, and SEC Form 4 filings with a transparent scoring system. Real-time data from SEC EDGAR.",
+    "Track public congressional stock trade disclosures, STOCK Act filings, and reported trades with a clean educational dashboard from Signal Alpha.",
   keywords: [
-    "insider trading tracker",
-    "STOCK Act disclosures",
     "congressional stock trades",
+    "STOCK Act disclosures",
+    "congressional financial disclosures",
+    "politician stock trading tracker",
     "SEC Form 4 filings",
-    "insider buying signals",
-    "government official trades",
-    "market disclosure scoring",
+    "insider trade disclosures",
+    "public trading disclosures",
     "SEC EDGAR data",
   ],
   openGraph: {
-    title: "SignalAlpha — Public Market Disclosure Tracker",
+    title: "Signal Alpha | Congress Stock Trade Tracker & STOCK Act Disclosure Dashboard",
     description:
-      "Track insider trades and congressional stock disclosures. Transparent scoring system powered by SEC EDGAR and STOCK Act data.",
+      "Track public congressional stock trade disclosures, STOCK Act filings, and reported trades with a clean educational dashboard from Signal Alpha.",
     type: "website",
-    siteName: "SignalAlpha",
+    siteName: "Signal Alpha Stock",
   },
   twitter: {
     card: "summary",
-    title: "SignalAlpha — Public Market Disclosure Tracker",
+    title: "Signal Alpha | Congress Stock Trade Tracker",
     description:
-      "Track insider trades and congressional stock disclosures with a transparent scoring system.",
+      "Track congressional stock trade disclosures and STOCK Act filings with a transparent scoring dashboard.",
   },
   robots: { index: true, follow: true },
 };

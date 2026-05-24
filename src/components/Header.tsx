@@ -33,7 +33,7 @@ export default function Header() {
               <circle cx="17" cy="11" r="3" fill="white" />
             </svg>
             <span>
-              Signal<span className="text-blue-600">Alpha</span>
+              Signal Alpha <span className="text-blue-600">Stock</span>
             </span>
           </Link>
 
