@@ -8,6 +8,11 @@ import DisclaimerBox from "@/components/DisclaimerBox";
 import DailyAlphaPicksClient from "./DailyAlphaPicksClient";
 import type { NewsSource } from "@/types/dailyAlpha";
 
+// ISR: re-run server component every 6 hours so GDELT articles stay fresh
+// without requiring a manual redeploy. Matches the unstable_cache TTL in
+// getDailyAlphaPicks.ts so each revalidation triggers a real GDELT fetch.
+export const revalidate = 21600;
+
 export const metadata: Metadata = {
   title: "Daily Alpha Picks — Signal Alpha Stock",
   description:

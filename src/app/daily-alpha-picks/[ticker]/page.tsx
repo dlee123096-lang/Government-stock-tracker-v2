@@ -12,6 +12,12 @@ import DailyAlphaScoreBreakdown from "@/components/DailyAlphaScoreBreakdown";
 import NewsArticleList from "@/components/NewsArticleList";
 import DisclaimerBox from "@/components/DisclaimerBox";
 
+// ISR: re-run this server component every 6 hours so each ticker page gets
+// fresh GDELT articles without a manual redeploy. generateStaticParams still
+// pre-renders all known tickers at build time; revalidate adds background
+// refresh afterward.
+export const revalidate = 21600;
+
 interface PageProps {
   params: { ticker: string };
 }
