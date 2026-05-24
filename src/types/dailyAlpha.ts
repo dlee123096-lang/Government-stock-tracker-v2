@@ -57,8 +57,14 @@ export interface SupportingArticle {
   url: string;
   sentiment: ArticleSentiment;
   trustScore: number; // 0-100, derived from src/lib/newsSources.ts
-  /** Short original summary written for this mock dataset. Never copies full article text. */
+  /** Short original summary. For GDELT articles: "Headline indexed via GDELT." Never full article text. */
   summary: string;
+  /** Normalised source domain (e.g. "reuters.com"). Present on GDELT articles. */
+  sourceDomain?: string;
+  /** 0–100 relevance to the specific ticker/company. See src/lib/newsScoring.ts. */
+  relevanceScore?: number;
+  /** Whether this article came from a live API or the mock dataset. */
+  dataSource?: "GDELT" | "mock";
 }
 
 export interface DailyAlphaPickInput {

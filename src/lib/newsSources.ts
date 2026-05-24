@@ -1,19 +1,17 @@
 /**
  * Trusted news source registry.
  *
- * Every supporting article in the Daily Alpha Picks dataset is assigned a
- * trustScore. The score is a transparent heuristic — higher = more
- * authoritative, lower = treat with caution. It does NOT imply endorsement
- * of any source, nor that high-trust outlets are always correct.
+ * Every supporting article is assigned a trustScore (0–100). The score is a
+ * transparent heuristic — higher = more authoritative. It does NOT imply
+ * endorsement of any source, nor that high-trust outlets are always correct.
  *
  * Buckets:
- *   100 = primary source (SEC filings, company IR direct)
- *    90 = top-tier wire / business journalism
- *    80 = major financial outlet
- *    70 = secondary business / data outlet
- *    50 = mainstream but lower-context outlet
- *    30 = aggregator / commentary
- *    10 = unverified / promotional / unknown
+ *   95–100 = primary source (SEC, OGE, company IR, major exchanges)
+ *    80–94 = top-tier wire / major financial journalism
+ *    70–79 = secondary business / data outlets
+ *    50–69 = aggregators, PR wires, mainstream non-finance
+ *    20–49 = commentary, unknown blogs
+ *     0–19 = promotional / penny-stock / unverified
  *
  * IMPORTANT: We never reproduce article text. Only headline, source, date,
  * link, and a short ORIGINAL summary are displayed (see SupportingArticle).
@@ -24,77 +22,128 @@ interface SourceTier {
   notes: string;
 }
 
-const TIERS: Record<string, SourceTier> = {
-  // ── Primary sources (100) ─────────────────────────────────────────────
-  "SEC EDGAR": { score: 100, notes: "Filing source of record" },
-  "Company Investor Relations": {
-    score: 100,
-    notes: "Direct from the company",
-  },
-  "Company Press Release": { score: 95, notes: "Direct company statement" },
-  "Federal Reserve": { score: 100, notes: "Policy primary source" },
+// ── Source name → trust score ──────────────────────────────────────────────
+const SOURCE_TIERS: Record<string, SourceTier> = {
+  // Primary sources (95–100)
+  "SEC EDGAR":                   { score: 100, notes: "Filing source of record" },
+  "Company Investor Relations":  { score: 100, notes: "Direct from the company" },
+  "Company Press Release":       { score: 95,  notes: "Direct company statement" },
+  "Federal Reserve":             { score: 100, notes: "Policy primary source" },
   "Office of Government Ethics": { score: 100, notes: "OGE filings" },
+  Nasdaq:                        { score: 92,  notes: "Exchange-published news" },
+  NYSE:                          { score: 92,  notes: "Exchange-published news" },
 
-  // ── Top-tier wires / business journalism (90) ─────────────────────────
-  Reuters: { score: 90, notes: "Global wire" },
-  AP: { score: 90, notes: "Associated Press wire" },
-  "Associated Press": { score: 90, notes: "Wire service" },
+  // Top-tier wires / major financial journalism (80–94)
+  Reuters:                       { score: 93, notes: "Global wire service" },
+  AP:                            { score: 92, notes: "Associated Press wire" },
+  "Associated Press":            { score: 92, notes: "Wire service" },
+  "Financial Times":             { score: 90, notes: "Premium financial daily" },
+  "The Wall Street Journal":     { score: 88, notes: "Major financial daily" },
+  WSJ:                           { score: 88, notes: "Major financial daily" },
+  Bloomberg:                     { score: 85, notes: "Headlines/links only; paywall for full text" },
+  "Barron's":                    { score: 83, notes: "Business weekly" },
+  Barrons:                       { score: 83, notes: "Business weekly" },
+  CNBC:                          { score: 82, notes: "Business news network" },
+  MarketWatch:                   { score: 82, notes: "Financial news outlet" },
 
-  // ── Major financial outlets (80) ──────────────────────────────────────
-  "The Wall Street Journal": { score: 85, notes: "Major financial daily" },
-  WSJ: { score: 85, notes: "Major financial daily" },
-  Barrons: { score: 80, notes: "Business weekly" },
-  "Barron's": { score: 80, notes: "Business weekly" },
-  CNBC: { score: 80, notes: "Business news network" },
-  MarketWatch: { score: 80, notes: "Financial news outlet" },
-  Bloomberg: {
-    score: 80,
-    notes: "Headlines/links only; full text behind paywall",
-  },
+  // Secondary business / data outlets (70–79)
+  "Yahoo Finance":               { score: 75, notes: "Aggregated finance portal" },
+  Morningstar:                   { score: 78, notes: "Independent research firm" },
+  Zacks:                         { score: 70, notes: "Quant research firm" },
+  "The Motley Fool":             { score: 70, notes: "Retail investor-focused" },
+  TheStreet:                     { score: 72, notes: "Finance news & analysis" },
 
-  // ── Secondary business / data outlets (70) ────────────────────────────
-  "Yahoo Finance": { score: 70, notes: "Aggregated finance portal" },
-  Nasdaq: { score: 70, notes: "Exchange-published news" },
-  NYSE: { score: 70, notes: "Exchange-published news" },
-  Morningstar: { score: 75, notes: "Independent research firm" },
-  Zacks: { score: 65, notes: "Quant research firm" },
-  Reuters_Markets: { score: 85, notes: "Reuters markets desk" },
+  // Aggregators / PR wires (50–69)
+  "Business Wire":               { score: 62, notes: "PR distribution" },
+  "PR Newswire":                 { score: 62, notes: "PR distribution" },
+  "Investing.com":               { score: 58, notes: "Aggregator" },
+  "Benzinga":                    { score: 55, notes: "Trader-focused aggregator" },
+  "Benzinga (headline only)":    { score: 55, notes: "Trader-focused aggregator" },
 
-  // ── Mainstream lower-context outlets (50) ─────────────────────────────
-  "Investing.com": { score: 55, notes: "Aggregator" },
-  "Benzinga (headline only)": {
-    score: 50,
-    notes: "Trader-focused aggregator",
-  },
-  "Business Wire": { score: 60, notes: "PR distribution" },
-  "PR Newswire": { score: 60, notes: "PR distribution" },
+  // Commentary / independent blogs (20–49)
+  "Generic blog":                { score: 30, notes: "Independent commentary" },
+  Substack:                      { score: 30, notes: "Independent newsletter" },
+  Medium:                        { score: 25, notes: "Independent platform" },
+  "Seeking Alpha":               { score: 45, notes: "Crowd-sourced analysis; contributor quality varies" },
 
-  // ── Aggregators / commentary (30) ─────────────────────────────────────
-  "Generic blog": { score: 30, notes: "Independent commentary" },
-  Substack: { score: 30, notes: "Independent newsletter" },
-  Medium: { score: 25, notes: "Independent platform" },
-
-  // ── Unverified / promotional (10) ─────────────────────────────────────
-  "Promotional newsletter": {
-    score: 10,
-    notes: "Likely paid promotion — caution",
-  },
-  "Penny stock site": { score: 10, notes: "High promotion risk" },
-  "Unverified social media": { score: 10, notes: "Unattributed claim" },
+  // Promotional / unverified (0–19)
+  "Promotional newsletter":      { score: 10, notes: "Likely paid promotion — treat with caution" },
+  "Penny stock site":            { score: 5,  notes: "High promotion risk" },
+  "Unverified social media":     { score: 5,  notes: "Unattributed claim" },
 };
 
+// ── Domain → trust score (used by GDELT adapter) ──────────────────────────
+// GDELT returns raw domains (e.g. "reuters.com"). Map them to trust scores
+// without requiring exact name matching.
+const DOMAIN_SCORES: Record<string, number> = {
+  // Primary / exchanges
+  "sec.gov":            100,
+  "oge.gov":            100,
+  "nasdaq.com":         92,
+  "nyse.com":           92,
+  "ir.example.com":     95, // placeholder for company IR domains
+
+  // Top-tier wires
+  "reuters.com":        93,
+  "apnews.com":         92,
+  "ft.com":             90,
+  "wsj.com":            88,
+  "bloomberg.com":      85,
+  "barrons.com":        83,
+  "cnbc.com":           82,
+  "marketwatch.com":    82,
+
+  // Secondary business
+  "finance.yahoo.com":  75,
+  "yahoo.com":          72,
+  "morningstar.com":    78,
+  "zacks.com":          70,
+  "fool.com":           70,
+  "thestreet.com":      72,
+
+  // Aggregators / PR
+  "businesswire.com":   62,
+  "prnewswire.com":     62,
+  "globenewswire.com":  60,
+  "investing.com":      58,
+  "benzinga.com":       55,
+  "seekingalpha.com":   45,
+
+  // Commentary
+  "substack.com":       30,
+  "medium.com":         25,
+};
+
+// ── Public API ─────────────────────────────────────────────────────────────
+
 /**
- * Look up the trust score for a source name. Unknown sources default to 30
- * (treated as low-trust aggregator) — the UI should make this visible so
- * the user can scrutinize unfamiliar names.
+ * Look up trust score by source name (exact match or case-insensitive fallback).
+ * Unknown sources default to 30 (low-trust aggregator).
  */
 export function getSourceTrustScore(sourceName: string): number {
-  const direct = TIERS[sourceName];
+  if (!sourceName) return 30;
+  const direct = SOURCE_TIERS[sourceName];
   if (direct) return direct.score;
-  // Case-insensitive fallback for common variants
   const lower = sourceName.toLowerCase();
-  for (const [name, tier] of Object.entries(TIERS)) {
+  for (const [name, tier] of Object.entries(SOURCE_TIERS)) {
     if (name.toLowerCase() === lower) return tier.score;
+  }
+  return 30;
+}
+
+/**
+ * Look up trust score by domain name (e.g. "reuters.com").
+ * Used by the GDELT adapter which returns raw domains, not source names.
+ * Unknown domains default to 30.
+ */
+export function getDomainTrustScore(domain: string): number {
+  if (!domain) return 30;
+  const lower = domain.toLowerCase().replace(/^www\./, "");
+  const direct = DOMAIN_SCORES[lower];
+  if (direct !== undefined) return direct;
+  // Partial suffix match (e.g. "finance.yahoo.com" → "yahoo.com")
+  for (const [d, score] of Object.entries(DOMAIN_SCORES)) {
+    if (lower.endsWith("." + d) || lower === d) return score;
   }
   return 30;
 }
@@ -114,8 +163,22 @@ export function describeSourceTrust(sourceName: string): {
   return {
     score,
     band,
-    notes: TIERS[sourceName]?.notes ?? "Source not in registry",
+    notes: SOURCE_TIERS[sourceName]?.notes ?? "Source not in registry — treat with caution",
   };
 }
 
-export const TRUSTED_SOURCE_NAMES: string[] = Object.keys(TIERS);
+/**
+ * Classify a trust score into a human-readable band.
+ * Used for articles where we have a pre-computed score (e.g. GDELT pipeline).
+ */
+export function trustBand(
+  score: number,
+): "Primary" | "High" | "Medium" | "Low" | "Caution" {
+  if (score >= 95) return "Primary";
+  if (score >= 80) return "High";
+  if (score >= 60) return "Medium";
+  if (score >= 30) return "Low";
+  return "Caution";
+}
+
+export const TRUSTED_SOURCE_NAMES: string[] = Object.keys(SOURCE_TIERS);

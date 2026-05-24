@@ -4,18 +4,22 @@
  * On each build (or ISR revalidation):
  *   1. Load mock pick inputs from src/data/mockDailyAlphaPicks.ts
  *   2. Score them with computeFullDailyAlphaPick
- *   3. Attempt GDELT news enrichment per ticker (USE_GDELT_NEWS=1 activates)
- *   4. Set newsSource badge per pick
- *   5. Sort by dailyAlphaScore (desc)
+ *   3. Sort by initial score; fetch GDELT only for the top 20
+ *   4. Recalculate newsCatalystScore + dailyAlphaScore for GDELT-enriched picks
+ *   5. Re-sort all picks by final score
  *
  * Result is cached via unstable_cache (6-hour TTL).
- * All functions are async to support live news adapters cleanly.
  */
 
 import { unstable_cache } from "next/cache";
 import { mockDailyAlphaPicks } from "@/data/mockDailyAlphaPicks";
-import { computeFullDailyAlphaPick } from "@/lib/dailyAlphaScoring";
+import {
+  computeFullDailyAlphaPick,
+  computeDailyAlphaScore,
+  computeDailyAlphaLabel,
+} from "@/lib/dailyAlphaScoring";
 import { fetchGdeltNewsForTicker } from "@/lib/newsAdapters";
+import { computeNewsCatalystScore } from "@/lib/newsScoring";
 import type { DailyAlphaPick, NewsSource } from "@/types/dailyAlpha";
 
 export interface DailyAlphaPicksResult {
@@ -23,37 +27,54 @@ export interface DailyAlphaPicksResult {
   top10: DailyAlphaPick[];
   top20: DailyAlphaPick[];
   generatedAt: string;
-  newsSource: NewsSource; // representative source used across picks
+  newsSource: NewsSource; // representative source across picks
 }
 
 const fetchDailyAlphaPicksRaw = unstable_cache(
   async (): Promise<DailyAlphaPicksResult> => {
-    const scored = mockDailyAlphaPicks.map(computeFullDailyAlphaPick);
-    const sorted = [...scored].sort(
+    // Initial scoring pass with mock data.
+    const initialScored = mockDailyAlphaPicks.map(computeFullDailyAlphaPick);
+    const initialSorted = [...initialScored].sort(
       (a, b) => b.dailyAlphaScore - a.dailyAlphaScore,
     );
 
     const gdeltEnabled = process.env.USE_GDELT_NEWS === "1";
-
-    // Enrich with GDELT news in batches of 5 to be friendly to the API
-    const enriched: DailyAlphaPick[] = [];
     let anyLive = false;
 
+    const enriched: DailyAlphaPick[] = [];
+
     if (gdeltEnabled) {
+      // Only enrich the top 20 with GDELT — keeps request count low.
+      const top20 = initialSorted.slice(0, 20);
+      const rest = initialSorted.slice(20);
+
       const BATCH = 5;
-      for (let i = 0; i < sorted.length; i += BATCH) {
-        const slice = sorted.slice(i, i + BATCH);
+      for (let i = 0; i < top20.length; i += BATCH) {
+        const slice = top20.slice(i, i + BATCH);
         const results = await Promise.all(
-          slice.map(async (pick) => {
-            const articles = await fetchGdeltNewsForTicker(pick.ticker);
+          slice.map(async (pick): Promise<DailyAlphaPick> => {
+            const articles = await fetchGdeltNewsForTicker(
+              pick.ticker,
+              pick.company,
+            );
+
             if (articles.length > 0) {
               anyLive = true;
+              // Recalculate newsCatalystScore from live articles.
+              const newsCatalystScore = computeNewsCatalystScore(articles);
+              const updatedInput = { ...pick, newsCatalystScore, supportingArticles: articles };
+              const dailyAlphaScore = computeDailyAlphaScore(updatedInput);
+              const scoreLabel = computeDailyAlphaLabel(dailyAlphaScore);
               return {
                 ...pick,
+                newsCatalystScore,
                 supportingArticles: articles,
-                newsSource: "Live GDELT" as NewsSource,
+                dailyAlphaScore,
+                scoreLabel,
+                newsSource: "Live GDELT",
               };
             }
+
             const ns: NewsSource =
               pick.supportingArticles.length > 0
                 ? "Mock fallback"
@@ -63,8 +84,20 @@ const fetchDailyAlphaPicksRaw = unstable_cache(
         );
         enriched.push(...results);
       }
+
+      // Remaining picks keep their mock data unchanged.
+      for (const pick of rest) {
+        const ns: NewsSource =
+          pick.supportingArticles.length > 0
+            ? "Mock fallback"
+            : "No articles found";
+        enriched.push({ ...pick, newsSource: ns });
+      }
+
+      // Re-sort by final scores now that top-20 may have changed.
+      enriched.sort((a, b) => b.dailyAlphaScore - a.dailyAlphaScore);
     } else {
-      for (const pick of sorted) {
+      for (const pick of initialSorted) {
         const ns: NewsSource =
           pick.supportingArticles.length > 0
             ? "Mock fallback"
@@ -87,7 +120,7 @@ const fetchDailyAlphaPicksRaw = unstable_cache(
       newsSource: representativeSource,
     };
   },
-  ["signal-alpha-daily-alpha-picks-v2"],
+  ["signal-alpha-daily-alpha-picks-v3"],
   { revalidate: 21_600 }, // 6-hour cache
 );
 
@@ -143,7 +176,7 @@ export async function getDailyAlphaSummary(): Promise<DailyAlphaSummary> {
     ) / 10;
   const trustedArticleCount = all.reduce(
     (sum, p) =>
-      sum + p.supportingArticles.filter((a) => a.trustScore >= 60).length,
+      sum + p.supportingArticles.filter((a) => a.trustScore >= 70).length,
     0,
   );
 

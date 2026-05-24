@@ -53,19 +53,38 @@ research tool. We deliberately never describe a pick as a "buy" or "sell."
 Picks are inputs to your own research process — see the full disclaimer on
 every page.
 
-### Replacing mock article data with live news later
+### Live news via GDELT (free, no API key)
 
-`src/lib/newsAdapters.ts` ships four pre-wired free-tier adapters (GDELT,
-Alpha Vantage, Finnhub, Financial Modeling Prep). Each returns `[]` unless
-its environment variable is set, so the build never breaks. To activate:
+SignalAlpha integrates with the [GDELT DOC API v2](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) — a real-time global news index maintained by Google Ideas. It's completely free and requires no API key.
 
-1. Sign up for the provider's free tier and copy the API key
-2. Set the matching env var in `.env.local` (locally) and in your Vercel
-   project settings (production)
-3. In `src/lib/getDailyAlphaPicks.ts`, call the adapter and merge results
-   into the `supportingArticles` array for each pick
+**To enable live GDELT news:**
 
-See `COST_CONTROL.md` for the full policy on which APIs are allowed.
+1. In your Vercel project settings → Environment Variables, add:
+   ```
+   USE_GDELT_NEWS=1
+   ```
+2. Redeploy (or wait for the next daily GitHub Actions rebuild at 07:00 UTC).
+
+**How it works when enabled:**
+
+- All picks are scored with initial data, sorted, and the **top 20 only** are queried for GDELT news articles (capped at ~3 days back, 5 articles per ticker)
+- Each article is normalised into: title, source, domain, date, URL, trust score (0–100), relevance score (0–100), sentiment
+- Only articles with trust ≥ 70 (from outlets like Reuters, AP, Bloomberg, CNBC, WSJ, Morningstar, etc.) influence the **News Catalyst Score**
+- The News Catalyst Score is recalculated from live articles, then the Daily Alpha Score updates and picks are re-sorted
+- If GDELT fails or returns no trusted articles, the pick falls back to mock data — no build failure, no broken pages
+- A "Live GDELT" badge appears on articles; a "Mock fallback" badge shows when using sample data
+
+**Key files:**
+
+| File | Role |
+| --- | --- |
+| `src/lib/newsAdapters.ts` | `fetchGdeltNewsForTicker` — calls GDELT, deduplicates, filters |
+| `src/lib/newsNormalizer.ts` | `normalizeGdeltArticle` — converts raw GDELT JSON → `SupportingArticle` |
+| `src/lib/newsScoring.ts` | `computeNewsCatalystScore`, `computeArticleRelevanceScore`, `buildRankingReasons` |
+| `src/lib/newsSources.ts` | Trust score registry; `getDomainTrustScore` for domain-based lookup |
+| `src/lib/getDailyAlphaPicks.ts` | Orchestrates: initial score → top-20 GDELT fetch → rescore → resort |
+
+See `COST_CONTROL.md` for the full policy on which APIs are allowed and why.
 
 ## Data sources
 

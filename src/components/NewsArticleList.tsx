@@ -34,6 +34,18 @@ function formatDate(iso: string): string {
   });
 }
 
+function relevanceLabel(score: number): string {
+  if (score >= 70) return "High relevance";
+  if (score >= 40) return "Moderate relevance";
+  return "Low relevance";
+}
+
+const RELEVANCE_STYLES: Record<string, string> = {
+  "High relevance": "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  "Moderate relevance": "bg-amber-50 text-amber-700 ring-amber-200",
+  "Low relevance": "bg-slate-50 text-slate-500 ring-slate-200",
+};
+
 export default function NewsArticleList({
   articles,
   limit,
@@ -64,11 +76,18 @@ export default function NewsArticleList({
               >
                 {a.title}
               </a>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 whitespace-nowrap ${SENTIMENT_STYLES[a.sentiment]}`}
-              >
-                {a.sentiment}
-              </span>
+              <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 whitespace-nowrap ${SENTIMENT_STYLES[a.sentiment]}`}
+                >
+                  {a.sentiment}
+                </span>
+                {a.dataSource === "GDELT" && (
+                  <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full ring-1 bg-green-50 text-green-700 ring-green-200 whitespace-nowrap">
+                    Live GDELT
+                  </span>
+                )}
+              </div>
             </div>
             <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 flex-wrap">
               <span className="font-medium text-slate-700">{a.source}</span>
@@ -78,6 +97,14 @@ export default function NewsArticleList({
               >
                 {trust.band} trust · {trust.score}
               </span>
+              {typeof a.relevanceScore === "number" && (
+                <span
+                  className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full ring-1 ${RELEVANCE_STYLES[relevanceLabel(a.relevanceScore)]}`}
+                  title={`Relevance score: ${a.relevanceScore}/100`}
+                >
+                  {relevanceLabel(a.relevanceScore)} · {a.relevanceScore}
+                </span>
+              )}
               <span className="text-slate-400">·</span>
               <span>{formatDate(a.publishedDate)}</span>
             </div>

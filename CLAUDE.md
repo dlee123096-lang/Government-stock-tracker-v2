@@ -139,14 +139,18 @@ Daily Alpha Score =
 ```
 Labels: Exceptional Candidate (90+) / High-Conviction (80+) / Strong Research (70+) / Watchlist (60+) / Low Priority (<60).
 
-**Data service** — `src/lib/getDailyAlphaPicks.ts`. Async, wrapped in `unstable_cache` (key `"signal-alpha-daily-alpha-picks-v2"`, TTL 6 hours):
+**Data service** — `src/lib/getDailyAlphaPicks.ts`. Async, wrapped in `unstable_cache` (key `"signal-alpha-daily-alpha-picks-v3"`, TTL 6 hours):
 1. Load from `src/data/mockDailyAlphaPicks.ts` (44 mock inputs with static sub-scores).
-2. Score via `computeFullDailyAlphaPick`.
-3. If `USE_GDELT_NEWS=1`: fetch GDELT in batches of 5 per ticker, replace mock articles, set `newsSource: "Live GDELT"`.
+2. Score via `computeFullDailyAlphaPick`, sort to get initial ranking.
+3. If `USE_GDELT_NEWS=1`: fetch GDELT only for the **top 20** picks (batches of 5). For each hit: recalculate `newsCatalystScore` via `computeNewsCatalystScore(articles)`, recompute `dailyAlphaScore` + label, set `newsSource: "Live GDELT"`. Re-sort all picks by final score.
 4. Otherwise: set `newsSource: "Mock fallback"` or `"No articles found"`.
 5. Returns `{ all, top10, top20, generatedAt, newsSource }`.
 
-**News adapters** — `src/lib/newsAdapters.ts`. Four adapters (GDELT, Alpha Vantage, Finnhub, FMP), all return `[]` when their env var is absent. GDELT (`USE_GDELT_NEWS=1`) needs no API key and is the recommended first activation. Cache: 6-hour revalidation.
+**News pipeline** — three files work together:
+- `src/lib/newsAdapters.ts` — `fetchGdeltNewsForTicker(ticker, company, daysBack=3, maxArticles=5)`: calls GDELT DOC API v2, deduplicates URLs + near-duplicate headlines (first 50 chars), applies trust filter (≥70), freshness filter (≤ daysBack days), sorts by relevance then trust. Returns `[]` if `USE_GDELT_NEWS !== "1"` or GDELT fails.
+- `src/lib/newsNormalizer.ts` — `normalizeGdeltArticle(raw, ticker, company)`: parses GDELT date format (`"20240115T120000Z"` → `"2024-01-15"`), extracts domain from URL, maps domain to source name, calls `getDomainTrustScore` + `computeArticleRelevanceScore`. Sets `dataSource: "GDELT"`.
+- `src/lib/newsScoring.ts` — three pure exports: `computeArticleRelevanceScore` (+40 company name in headline, +30 ticker, +20 financial domain, +10 published <24h), `computeNewsCatalystScore` (aggregates trusted articles → 0–100 score; returns 20 neutral baseline if no trusted articles), `buildRankingReasons` (generates bullet-point strings for the "Why this ranked today" detail page section).
+- `src/lib/newsSources.ts` — trust registry by source name + domain. `getDomainTrustScore(domain)` used by GDELT normalizer. `trustBand(score)` converts number to "Primary"|"High"|"Medium"|"Low"|"Caution". All four exports from before still present.
 
 **Pages** — `/daily-alpha-picks` (async server component), `/daily-alpha-picks/[ticker]` (async, `generateStaticParams` awaits `getDailyAlphaPicks()`). Both `generateMetadata` and the default export are `async`.
 

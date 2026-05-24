@@ -18,8 +18,19 @@ No database, no auth, no paid APIs, no managed services.
 ## Daily Alpha Picks news strategy
 
 The Daily Alpha Picks page ships with **fully mock article data**. Real news
-data can be added later via the optional adapters in `src/lib/newsAdapters.ts`,
+data can be added via the optional adapters in `src/lib/newsAdapters.ts`,
 which are wired so that the build never breaks when API keys are missing.
+
+**GDELT is now the primary live news source** (no API key required):
+- Activation: set `USE_GDELT_NEWS=1` in Vercel project settings or `.env.local`
+- GDELT is queried only for the **top 20 picks** by initial Daily Alpha Score —
+  never for every ticker on the list. This caps live requests at 20 per build window.
+- Each GDELT query fetches at most 25 candidate articles; after dedup, trust filtering
+  (≥ 70), and freshness filtering (≤ 3 days), 3–5 articles per ticker typically remain.
+- If GDELT fails or returns no trusted articles, the pick falls back to mock data
+  seamlessly — the build never fails because of a GDELT outage.
+- GDELT scores recalculate `newsCatalystScore` and `dailyAlphaScore` for affected picks,
+  then the list is re-sorted by final score.
 
 Approved free-tier providers (none required, all opt-in):
 

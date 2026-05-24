@@ -6,6 +6,8 @@ import {
   getDailyAlphaPicks,
 } from "@/lib/getDailyAlphaPicks";
 import { DAILY_ALPHA_LABEL_STYLES } from "@/lib/dailyAlphaScoring";
+import { buildRankingReasons } from "@/lib/newsScoring";
+import { trustBand } from "@/lib/newsSources";
 import DailyAlphaScoreBreakdown from "@/components/DailyAlphaScoreBreakdown";
 import NewsArticleList from "@/components/NewsArticleList";
 import DisclaimerBox from "@/components/DisclaimerBox";
@@ -29,10 +31,41 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+const SENTIMENT_CELL: Record<string, string> = {
+  Bullish: "text-emerald-700 font-semibold",
+  Neutral: "text-slate-500",
+  Bearish: "text-rose-700 font-semibold",
+};
+
+const TRUST_BAND_PILL: Record<string, string> = {
+  Primary: "bg-purple-50 text-purple-700 ring-purple-200",
+  High: "bg-blue-50 text-blue-700 ring-blue-200",
+  Medium: "bg-slate-50 text-slate-600 ring-slate-200",
+  Low: "bg-amber-50 text-amber-700 ring-amber-200",
+  Caution: "bg-rose-50 text-rose-700 ring-rose-200",
+};
+
 export default async function DailyAlphaPickDetailPage({ params }: PageProps) {
   const ticker = decodeURIComponent(params.ticker);
   const pick = await getDailyAlphaPickByTicker(ticker);
   if (!pick) notFound();
+
+  const rankingReasons = buildRankingReasons({
+    dailyAlphaScore: pick.dailyAlphaScore,
+    newsCatalystScore: pick.newsCatalystScore,
+    disclosureSignalScore: pick.disclosureSignalScore,
+    momentumScore: pick.momentumScore,
+    fundamentalQualityScore: pick.fundamentalQualityScore,
+    valuationScore: pick.valuationScore,
+    earningsRevisionScore: pick.earningsRevisionScore,
+    riskPenalty: pick.riskPenalty,
+    hasGovernmentDisclosureOverlap: pick.hasGovernmentDisclosureOverlap,
+    hasEdgarInsiderOverlap: pick.hasEdgarInsiderOverlap,
+    hasInstitutionalOverlap: pick.hasInstitutionalOverlap,
+    hasActivistOverlap: pick.hasActivistOverlap,
+    supportingArticles: pick.supportingArticles,
+    newsSource: pick.newsSource,
+  });
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -98,6 +131,26 @@ export default async function DailyAlphaPickDetailPage({ params }: PageProps) {
           {pick.mainCatalyst}
         </p>
       </section>
+
+      {/* Why this ranked today */}
+      {rankingReasons.length > 0 && (
+        <section className="mt-6 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-800 mb-3">
+            Why this ranked today
+          </h2>
+          <ul className="space-y-2">
+            {rankingReasons.map((reason, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2 text-sm text-slate-700 leading-relaxed"
+              >
+                <span className="text-blue-400 mt-0.5 flex-shrink-0">▸</span>
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Score breakdown */}
       <section className="mt-6">
@@ -241,6 +294,97 @@ export default async function DailyAlphaPickDetailPage({ params }: PageProps) {
           public price data in a future iteration.
         </p>
       </section>
+
+      {/* News Verification */}
+      {pick.supportingArticles.length > 0 && (
+        <section className="mt-6 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">
+            News verification
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Articles used to compute the News Catalyst Score ({pick.newsCatalystScore}/100).
+            Only articles with trust ≥ 70 influence the score.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-500 uppercase tracking-wider">
+                  <th className="pb-2 pr-4 font-semibold">Source</th>
+                  <th className="pb-2 pr-4 font-semibold">Date</th>
+                  <th className="pb-2 pr-4 font-semibold">Trust</th>
+                  <th className="pb-2 pr-4 font-semibold">Relevance</th>
+                  <th className="pb-2 pr-4 font-semibold">Sentiment</th>
+                  <th className="pb-2 font-semibold">Data</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pick.supportingArticles.map((a, i) => {
+                  const band = trustBand(a.trustScore);
+                  const isTrusted = a.trustScore >= 70;
+                  return (
+                    <tr
+                      key={i}
+                      className={isTrusted ? "" : "opacity-50"}
+                    >
+                      <td className="py-2 pr-4">
+                        <a
+                          href={a.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-blue-600 hover:underline"
+                          title={a.title}
+                        >
+                          {a.source}
+                        </a>
+                      </td>
+                      <td className="py-2 pr-4 text-slate-500 whitespace-nowrap">
+                        {a.publishedDate || "—"}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded-full ring-1 text-[10px] font-semibold ${TRUST_BAND_PILL[band]}`}
+                        >
+                          {band} · {a.trustScore}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4">
+                        {typeof a.relevanceScore === "number" ? (
+                          <span className="tabular-nums text-slate-700">
+                            {a.relevanceScore}/100
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td
+                        className={`py-2 pr-4 ${SENTIMENT_CELL[a.sentiment] ?? "text-slate-500"}`}
+                      >
+                        {a.sentiment}
+                      </td>
+                      <td className="py-2">
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded-full ring-1 text-[10px] font-semibold ${
+                            a.dataSource === "GDELT"
+                              ? "bg-green-50 text-green-700 ring-green-200"
+                              : "bg-slate-50 text-slate-500 ring-slate-200"
+                          }`}
+                        >
+                          {a.dataSource ?? "mock"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {pick.supportingArticles.some((a) => a.trustScore < 70) && (
+            <p className="mt-3 text-xs text-slate-400 italic">
+              Greyed-out rows have trust &lt; 70 and do not count toward the News Catalyst Score.
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Supporting articles */}
       <section className="mt-6">

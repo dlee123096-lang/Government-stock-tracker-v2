@@ -14,6 +14,7 @@ interface Term {
   long: string;
 }
 
+
 const TERMS: Term[] = [
   // ── Filings ──────────────────────────────────────────────────────────────
   {
@@ -112,6 +113,30 @@ const TERMS: Term[] = [
     long:
       "A 60% win rate means 6 of every 10 prior disclosures finished above their entry price over the measurement window. Combine with alpha for context — a high win rate with tiny gains is less interesting than a moderate win rate with large gains.",
   },
+  {
+    term: "News Catalyst Score",
+    category: "Scoring",
+    short:
+      "0–100 score measuring how much credible news is supporting a Daily Alpha Pick.",
+    long:
+      "Aggregates up to 5 trusted news articles per pick into a single number. Considers: number of trusted articles (trust ≥ 70, max 25 pts), average trust score (max 25 pts), average relevance to the specific ticker (max 20 pts), dominant sentiment across articles (max 15 pts), and multi-source confirmation from distinct outlets (max 15 pts). Returns a neutral baseline of 20 when no trusted articles exist, so the Daily Alpha Score degrades gracefully rather than zeroing out. Weighted at 20% of the Daily Alpha Score.",
+  },
+  {
+    term: "Source Trust Score",
+    category: "Scoring",
+    short:
+      "0–100 reliability rating for a news outlet, based on its editorial standards.",
+    long:
+      "Tiered heuristic: 95–100 = primary sources (SEC EDGAR, OGE, company IR); 80–94 = top-tier wires and major financial journalism (Reuters, AP, FT, WSJ, Bloomberg); 70–79 = secondary business outlets (Yahoo Finance, Morningstar, Zacks); 50–69 = aggregators and PR wires; 20–49 = commentary and independent blogs; 0–19 = promotional or unverified. Only articles with trust ≥ 70 count toward the News Catalyst Score. This is a transparency aid, not an editorial endorsement.",
+  },
+  {
+    term: "Relevance Score",
+    category: "Scoring",
+    short:
+      "0–100 measure of how directly a news article relates to a specific ticker.",
+    long:
+      "Computed per article: +40 if the company name appears in the headline, +30 if the ticker symbol appears (e.g. 'NVDA' or '$NVDA'), +20 if the source is a known financial domain, +10 if published within 24 hours, +5 if published within 48 hours. A perfectly relevant article from a financial outlet naming both company and ticker published today would score 100.",
+  },
 
   // ── Context ──────────────────────────────────────────────────────────────
   {
@@ -144,6 +169,30 @@ const TERMS: Term[] = [
       "Compensation stock that vests over time, often sold immediately on vest.",
     long:
       "Why insider 'sells' aren't necessarily bearish: most large-cap executives sell vested RSUs as routine compensation. Signal Alpha tags these where possible. A planned, recurring sale is much weaker signal than a discretionary open-market sale.",
+  },
+  {
+    term: "GDELT",
+    category: "Context",
+    short:
+      "Global Database of Events, Language, and Tone — a free real-time global news index.",
+    long:
+      "GDELT monitors print, broadcast, and web news in over 100 languages and makes article metadata (title, source, URL, date) available via a free public API — no key required. Signal Alpha uses the GDELT DOC API v2 to find recent news about the top 20 Daily Alpha Picks each day. Only headline, source, date, and URL are used — article text is never reproduced. GDELT is a research tool run by Google Ideas; it is not a news publisher itself.",
+  },
+  {
+    term: "Mock fallback",
+    category: "Context",
+    short:
+      "Curated sample data shown when live APIs are unavailable or disabled.",
+    long:
+      "Signal Alpha is designed to degrade gracefully. When GDELT is not enabled (USE_GDELT_NEWS ≠ 1) or a live fetch fails, picks display curated mock articles written for this dataset. Mock articles are clearly labeled. They are structurally identical to live articles so the UI and scoring pipeline behave the same way. The site always builds and deploys successfully regardless of API health.",
+  },
+  {
+    term: "Research Candidate",
+    category: "Context",
+    short:
+      "Signal Alpha's label for stocks that score well across multiple public data signals.",
+    long:
+      "A Research Candidate is not a buy or sell recommendation. It is a stock that ranks highly when public disclosures (insider filings, congressional trades, institutional 13Fs), news quality, momentum, fundamentals, and valuation are combined into the Daily Alpha Score. The label 'Strong Research Candidate' means the score fell in the 70–79 range. A high score means more convergent public signals — not that the stock will go up.",
   },
 ];
 

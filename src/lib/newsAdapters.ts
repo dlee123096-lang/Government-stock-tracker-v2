@@ -19,6 +19,7 @@
 
 import type { SupportingArticle } from "@/types/dailyAlpha";
 import { getSourceTrustScore } from "@/lib/newsSources";
+import { normalizeGdeltArticle, type GdeltRawArticle } from "@/lib/newsNormalizer";
 
 const TIMEOUT_MS = 8000;
 
@@ -46,32 +47,73 @@ async function safeFetchJson(url: string): Promise<unknown | null> {
 // GDELT — free, no API key required, very high coverage
 // Docs: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
 // Activation: set USE_GDELT_NEWS=1 — no key needed
+// Only called for top-20 picks to keep request count low.
 // ───────────────────────────────────────────────────────────────────────
 export async function fetchGdeltNewsForTicker(
   ticker: string,
+  company: string,
+  daysBack = 3,
+  maxArticles = 5,
 ): Promise<SupportingArticle[]> {
   if (process.env.USE_GDELT_NEWS !== "1") return [];
-  const query = encodeURIComponent(`${ticker} stock`);
-  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&format=JSON&maxrecords=5&sort=DateDesc`;
+
+  // Use both company name and ticker for best recall.
+  const query = `"${company}" OR "${ticker}" stock`;
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&format=JSON&maxrecords=25&sort=DateDesc&sourcelang=English`;
+
   const json = await safeFetchJson(url);
   if (!json || typeof json !== "object") return [];
-  const articles = (json as { articles?: unknown[] }).articles;
-  if (!Array.isArray(articles)) return [];
-  return articles
-    .filter(
-      (a): a is { title: string; url: string; sourcecountry?: string; domain?: string; seendate?: string } =>
-        typeof a === "object" && a !== null && "title" in a,
+
+  const raw = (json as { articles?: unknown[] }).articles;
+  if (!Array.isArray(raw)) return [];
+
+  const cutoffMs = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+  const normalized: SupportingArticle[] = [];
+  const seenUrls = new Set<string>();
+  const seenPrefixes = new Set<string>();
+
+  for (const item of raw) {
+    if (
+      typeof item !== "object" ||
+      item === null ||
+      !("title" in item) ||
+      !("url" in item)
     )
-    .slice(0, 5)
-    .map((a) => ({
-      title: a.title,
-      source: a.domain ?? "GDELT",
-      publishedDate: (a.seendate ?? "").slice(0, 10),
-      url: a.url,
-      sentiment: "Neutral" as const,
-      trustScore: getSourceTrustScore(a.domain ?? ""),
-      summary: "Headline indexed via GDELT. Click through for full article.",
-    }));
+      continue;
+
+    const raw_item = item as GdeltRawArticle;
+    if (!raw_item.title || !raw_item.url) continue;
+
+    // Deduplicate by URL.
+    if (seenUrls.has(raw_item.url)) continue;
+    seenUrls.add(raw_item.url);
+
+    // Near-duplicate headline dedup on first 50 chars.
+    const prefix = raw_item.title.slice(0, 50).toLowerCase();
+    if (seenPrefixes.has(prefix)) continue;
+    seenPrefixes.add(prefix);
+
+    const article = normalizeGdeltArticle(raw_item, ticker, company);
+
+    // Date freshness filter — skip anything older than daysBack.
+    if (article.publishedDate) {
+      const pubMs = new Date(article.publishedDate + "T12:00:00Z").getTime();
+      if (!Number.isNaN(pubMs) && pubMs < cutoffMs) continue;
+    }
+
+    // Trust filter — only high-quality sources influence the score.
+    if (article.trustScore < 70) continue;
+
+    normalized.push(article);
+  }
+
+  // Sort: highest relevance first, break ties by trust.
+  normalized.sort((a, b) => {
+    const relDiff = (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0);
+    return relDiff !== 0 ? relDiff : (b.trustScore ?? 0) - (a.trustScore ?? 0);
+  });
+
+  return normalized.slice(0, maxArticles);
 }
 
 // ───────────────────────────────────────────────────────────────────────
