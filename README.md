@@ -2,18 +2,30 @@
 
 > Track public market disclosures. Rank information-advantaged signals.
 
-SignalAlpha is an educational research tool that scores publicly disclosed stock trades from corporate insiders, government officials, hedge funds, and activist investors using a transparent three-part scoring system.
+SignalAlpha is an educational research tool that scores publicly disclosed stock trades from corporate insiders, members of Congress, hedge fund managers, executive branch officials, and activist investors using a transparent scoring system.
 
-**This is Version 1.** All data is sample/mock data stored locally. No paid APIs, no database, no login required.
+**No paid APIs, no database, no login required.** All data comes from free official public sources (SEC EDGAR, Senate eFD, OGE).
 
 ---
 
 ## What it does
 
-- **Ranks stock signals** using a Signal Score (0-100) and Track Record Score (0-100), combined into a Total Opportunity Score
-- **Filterable dashboard** with sort, search, and filter controls
-- **Detail pages** for each signal with full score breakdowns and plain-English explanations
+- **Ranks stock signals** using a Signal Score (0–100) and Track Record Score (0–100), combined into a Total Opportunity Score
+- **Filterable dashboard** with sort, search, and filter controls across 5 disclosure source types
+- **Detail pages** for each signal with stock price chart, full score breakdown, and plain-English explanation
 - **Score labels** from "Weak Signal" up to "Exceptional Signal"
+
+## Data sources
+
+| Source | Filing type | Update cadence | Status |
+|---|---|---|---|
+| Corporate Insider | SEC Form 4 | Within 2 business days of trade | ✅ Live |
+| Congress — Senate | Senate eFD PTR | STOCK Act 30–45 day window | ✅ Live |
+| Fund Manager / 13F | SEC Form 13F | Quarterly (45-day lag) | ✅ Live |
+| Congress — House | House Clerk PTR | STOCK Act 30–45 day window | ⚠️ Sample (PDFs only — no API) |
+| Executive Branch | OGE 278e / 278-T | Annual / periodic | ⚠️ Static (curated from public PDFs) |
+
+All sources are **free and official**. No API keys needed.
 
 ---
 
@@ -117,56 +129,52 @@ After this, anytime you push to GitHub, Vercel rebuilds and redeploys automatica
 
 | What you want to change | File |
 | --- | --- |
-| Sample stock signals | `src/data/mockSignals.ts` |
+| Sample/fallback signals | `src/data/mockSignals.ts` |
+| Live data pipeline | `src/data/liveSignals.ts` |
+| SEC Form 4 insider fetcher | `src/lib/edgar.ts` |
+| Senate eFD Congress fetcher | `src/lib/congress.ts` |
+| 13F fund manager fetcher | `src/lib/form13f.ts` |
+| House PTR fetcher (sample) | `src/lib/house.ts` |
+| OGE executive branch data | `src/data/ogeSignals.ts` |
 | Scoring formulas | `src/lib/scoring.ts` |
 | TypeScript types | `src/types/signal.ts` |
-| Home page content | `src/app/page.tsx` |
+| Committee–sector mapping | `src/data/committees.ts` |
 | Dashboard table | `src/components/SignalTable.tsx` |
 | Filter controls | `src/components/FilterBar.tsx` |
-| Score badges (colors) | `src/components/ScoreBadge.tsx` |
-| Footer disclaimer | `src/components/Footer.tsx` |
 
 ---
 
-## How real APIs would connect later
+## How to add a new data source
 
-The mock data is shaped so that real APIs can drop in cleanly. The contract is `SignalEntry` from `src/types/signal.ts`.
+The universal data contract is `SignalEntry` in `src/types/signal.ts`. Any public source can be wired in by:
 
-To swap in real data:
+1. Creating `src/lib/yourSource.ts` that returns `SignalEntry[]`
+2. Adding it to `Promise.allSettled([...])` in `src/data/liveSignals.ts`
+3. Adding its `signalType` string to `SIGNAL_TYPES` in `src/components/FilterBar.tsx`
+4. Adding any new `signalSubtype` strings to `SIGNAL_STRENGTH_MAP` in `src/lib/scoring.ts`
 
-1. Build a script (or API route) that fetches real disclosures (SEC Form 4, STOCK Act, 13F, 13D filings).
-2. Transform each filing into a `SignalEntry`.
-3. Replace `mockSignals` in `src/data/mockSignals.ts` with the result.
+The scoring logic is pure — it works on any `SignalEntry`, regardless of source.
 
-The scoring logic in `src/lib/scoring.ts` is completely pure — it works on any `SignalEntry`, regardless of where the data came from. No UI changes will be needed.
+## How the cache works
+
+`getSignals()` in `src/data/liveSignals.ts` is wrapped in `unstable_cache` (4-hour TTL). The 100+ sequential API calls only fire once per cache window. A GitHub Actions workflow triggers a Vercel deploy hook at 07:00 UTC daily, which busts the cache and fetches fresh data.
 
 ---
 
 ## Roadmap
 
-### Version 2 — Real insider data
-- Connect SEC Form 4 filings (free EDGAR API)
-- Add real insider buying/selling data
-- Compute real historical price performance
-- Compare each signal to S&P 500 returns
-- Real track record calculations
+### Implemented
+- ✅ Live SEC Form 4 insider data (~30 watched companies)
+- ✅ Live Senate STOCK Act disclosures (Senate eFD API)
+- ✅ Live 13F quarterly holdings (Berkshire, Pershing Square, Third Point, Appaloosa)
+- ✅ House PTR sample data (PDF-only limitation)
+- ✅ OGE executive branch static disclosures
+- ✅ Committee relevance scoring + official profile pages
+- ✅ Yahoo Finance stock price charts on detail pages
+- ✅ Daily GitHub Actions auto-refresh
 
-### Version 3 — Government disclosures
-- Add Congress STOCK Act disclosures
-- Add committee relevance scoring
-- Add government official profiles
-- Add sector-to-committee mapping
-
-### Version 4 — Institutional data
-- Add hedge fund 13F filings
-- Add activist 13D/13G filings
-- Add fund manager track records
-
-### Version 5 — Personalization & alerts
-- Add user watchlists
-- Add email alerts for new signals
-- Add daily auto-updates
-- Add backtesting
+### Not yet implemented
+- Watchlists, email alerts, backtesting, login, payments — out of scope
 
 ---
 

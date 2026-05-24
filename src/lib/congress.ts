@@ -153,7 +153,7 @@ export async function fetchCongressSignals(): Promise<SignalEntry[]> {
           id: uniqueId,
           ticker,
           company: cleanCompanyName(tx.asset_description),
-          signalType: "Government Official",
+          signalType: "Congress — Senate",
           personEntity: fullName,
           role,
           tradeType,
@@ -168,13 +168,15 @@ export async function fetchCongressSignals(): Promise<SignalEntry[]> {
           historicalWinRate: 52,
           historicalTradeCount: 5,
           recentPerformance: "Neutral recent performance",
+          dataFreshness: "Live",
+          reportUrl: `https://efts.senate.gov/v1/filings/${filing.id}`,
           explanation:
-            `STOCK Act disclosure. ${tradeType} of $${tradeSize.toLocaleString()} in ${ticker} by ${fullName} (${role}). ` +
+            `STOCK Act disclosure (Senate eFD). ${tradeType} of $${tradeSize.toLocaleString()} in ${ticker} by ${fullName} (${role}). ` +
             `Filed ${daysDelayed} day${daysDelayed === 1 ? "" : "s"} after the trade date.` +
             (contextTags.includes("Sector relevance to committee")
               ? " This official serves on a committee with direct oversight of this sector."
               : "") +
-            " Track record scores use neutral defaults — historical performance data planned for Version 4.",
+            " Amounts are STOCK Act ranges; midpoint shown. Track record scores use neutral defaults.",
         });
       }
     } catch {

@@ -17,15 +17,18 @@ On Windows: if `npm run build` fails with `EINVAL: invalid argument, readlink`, 
 
 ## Architecture
 
-### Data pipeline (two live sources + fallback)
+### Data pipeline (five sources + fallback)
 
-At build/request time, `src/app/dashboard/page.tsx` calls `getSignals()` from `src/data/liveSignals.ts`, which runs two sources concurrently via `Promise.allSettled`:
+At build/request time, `src/app/dashboard/page.tsx` calls `getSignals()` from `src/data/liveSignals.ts`, which runs four async sources concurrently via `Promise.allSettled`, plus one static source:
 
-1. **EDGAR** — `fetchEdgarSignals()` in `src/lib/edgar.ts` fetches real SEC Form 4 filings for ~30 watched companies across tech, financials, energy, healthcare, defense, and consumer sectors. Returns `SignalEntry[]` with `signalType: "Corporate Insider"`.
-2. **Congress** — `fetchCongressSignals()` in `src/lib/congress.ts` hits the Senate eFD API (`efts.senate.gov/v1/filings?filing_type=PT`) for Periodic Transaction Reports; fetches individual filing details for up to 15 recent filings and parses transaction JSON. Returns `SignalEntry[]` with `signalType: "Government Official"`.
-3. **Fallback** — if combined results < 5 entries, falls back to `computedSignals` from `src/data/mockSignals.ts`. `isLive: false`. One source failing never kills the other.
+1. **EDGAR** — `fetchEdgarSignals()` in `src/lib/edgar.ts`. SEC Form 4 filings for ~30 watched companies. `signalType: "Corporate Insider"`.
+2. **Congress — Senate** — `fetchCongressSignals()` in `src/lib/congress.ts`. Senate eFD API PTRs. `signalType: "Congress — Senate"`.
+3. **Fund Manager / 13F** — `fetchForm13fSignals()` in `src/lib/form13f.ts`. SEC Form 13F quarterly holdings for 4 watched institutional managers (Berkshire, Pershing Square, Third Point, Appaloosa). `signalType: "Fund Manager / 13F"`, `dataFreshness: "Quarterly"`.
+4. **Congress — House** — `fetchHouseSignals()` in `src/lib/house.ts`. House PTR disclosures. **No machine-readable API exists** (PDFs only) — always returns 5 curated sample entries. `signalType: "Congress — House"`, `dataFreshness: "Sample"`.
+5. **Executive Branch** (static) — `ogeComputedSignals` from `src/data/ogeSignals.ts`. OGE 278e/278-T public filings; pre-computed at import time. `signalType: "Executive Branch"`, `dataFreshness: "Manual document"`. Always included regardless of live source health.
+6. **Fallback** — if `edgarCount + senateCount + 13fCount < 5`, falls back to mock signals + OGE. `isLive: false`. One async source failing never kills the others.
 
-`getSignals()` is wrapped in `unstable_cache` (key `"signal-alpha-live-signals"`, TTL 4 hours) so the 100+ sequential SEC API calls only fire once per cache window — not on every page load. The dashboard page is therefore rendered statically (`○`) and ISR-refreshed. The daily GitHub Actions rebuild at 07:00 UTC also busts this cache by triggering a fresh Vercel deploy.
+`getSignals()` is wrapped in `unstable_cache` (key `"signal-alpha-live-signals-v6"`, TTL 4 hours) so the 100+ sequential SEC API calls only fire once per cache window. The daily GitHub Actions rebuild at 07:00 UTC busts this cache.
 
 The dashboard page passes `{ signals, lastUpdated, isLive }` down. `lastUpdated` is `new Date().toISOString()` captured at the time the cache is populated and rendered in the dashboard header as a live/sample badge + timestamp.
 
@@ -69,6 +72,29 @@ Names in `OFFICIALS` must exactly match the `personEntity` strings returned by `
 - Amount parsing: STOCK Act reports ranges (`"$15,001 - $50,000"`) — `parseStockActAmount()` takes the midpoint.
 - Caps at 15 filings per build with 150ms delay to avoid rate limits.
 - Returns `[]` on any error; `Promise.allSettled` in `liveSignals.ts` ensures one source failing doesn't break the other.
+- `signalType: "Congress — Senate"` (was `"Government Official"` before V6).
+
+### Form 13F client (`src/lib/form13f.ts`)
+
+- Watched managers: Berkshire Hathaway (0001067983), Pershing Square (0001336528), Third Point (0001040273), Appaloosa Management (0000913760).
+- Fetches `data.sec.gov/submissions/CIK{cik}.json` → finds most recent `13F-HR` → fetches `infotable.xml` from the archives path.
+- `extractAllBlocks(xml, tag)` iterates repeated `<infoTable>` elements (unlike Form 4 which has unique tags).
+- `ISSUER_TICKER_MAP` (60+ entries) translates `nameOfIssuer` → ticker. Holdings not in the map are skipped.
+- Takes top 8 holdings by value per manager, minimum $10M position. Cache: 6-hour revalidation (13F is quarterly, no point re-fetching hourly).
+- `signalType: "Fund Manager / 13F"`, `dataFreshness: "Quarterly"`, `tradeType: "Buy"`.
+
+### House PTR client (`src/lib/house.ts`)
+
+- House Clerk (`disclosures.ehouse.gov`) publishes PTR filing **metadata** in yearly ZIPs but transaction details are PDF-only — no machine-readable transaction API exists.
+- Always returns 5 curated sample entries (clearly labeled `dataFreshness: "Sample"`).
+- Pings the disclosure site for liveness but falls back to sample data either way.
+
+### OGE executive branch data (`src/data/ogeSignals.ts`)
+
+- Static curated entries from publicly filed OGE 278e (annual) and 278-T (periodic transaction) reports.
+- Pre-computed via `computeFullSignal` at import time — no async fetch.
+- `signalType: "Executive Branch"`, `dataFreshness: "Manual document"`.
+- Update manually when new public OGE filings become available at `oge.gov`.
 
 ### Official profile pages (`src/app/official/[name]/page.tsx`)
 
@@ -138,5 +164,6 @@ Page files (`app/*/page.tsx`) are server components — `dashboard/page.tsx` is 
 - **V2**: live EDGAR Form 4 insider data (`src/lib/edgar.ts` + `src/data/liveSignals.ts`)
 - **V3**: Congress STOCK Act disclosures via Senate eFD API + committee relevance scoring + official profile pages
 - **V4**: Bloomberg-lite UI refresh — summary cards, expandable rows, muted Buy/Sell badges, mobile card layout
-- **V5**: SVG logo + favicon, SEO metadata, Yahoo Finance stock price charts on signal detail pages; live EDGAR data fixed (extractXmlValue rewrite, CIK mismatch guard, xslF345X06 prefix strip, unstable_cache, expanded company list) ← current
-- **V6+**: 13F/13D hedge fund data, watchlists, email alerts, backtesting — do not implement without explicit instruction.
+- **V5**: SVG logo + favicon, SEO metadata, Yahoo Finance stock price charts on signal detail pages; live EDGAR data fixed (extractXmlValue rewrite, CIK mismatch guard, xslF345X06 prefix strip, unstable_cache, expanded company list)
+- **V6**: Five-source pipeline — SEC Form 13F (fund managers), House PTR sample data, OGE executive branch static data; updated SignalType enum; FilterBar and DashboardClient updated for new source categories ← current
+- **V7+**: Watchlists, email alerts, backtesting, paid data — do not implement without explicit instruction.

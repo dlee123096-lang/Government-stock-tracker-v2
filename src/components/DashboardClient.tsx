@@ -38,7 +38,7 @@ const SCORE_GUIDE = [
   {
     term: "Source Type",
     range: "Category",
-    desc: "Who filed: Corporate Insider (exec/director via Form 4), Government Official (Congress via STOCK Act), Hedge Fund (13F), or Activist (13D).",
+    desc: "Who filed: Corporate Insider (SEC Form 4), Congress — Senate/House (STOCK Act PTR), Fund Manager / 13F (quarterly holdings), Executive Branch (OGE 278e), or Activist (13D).",
   },
 ];
 
@@ -114,7 +114,31 @@ export default function DashboardClient({
               ))}
             </div>
 
-            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+            {/* Data source legend */}
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {[
+                { label: "Corporate Insider", tag: "Live", color: "green", note: "SEC Form 4, filed within 2 days of trade" },
+                { label: "Congress — Senate", tag: "Live", color: "green", note: "Senate eFD API, STOCK Act PTR filings" },
+                { label: "Congress — House", tag: "Sample", color: "amber", note: "PDFs only — no machine-readable API yet" },
+                { label: "Fund Manager / 13F", tag: "Quarterly", color: "blue", note: "SEC Form 13F, 45-day lag after quarter-end" },
+                { label: "Executive Branch", tag: "Document", color: "slate", note: "OGE 278e/278-T PDF filings, updated manually" },
+              ].map(({ label, tag, color, note }) => (
+                <div key={label} className="bg-slate-50 rounded-lg p-2.5 flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-semibold text-slate-700 leading-tight">{label}</span>
+                    <span className={`text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                      color === "green" ? "bg-green-100 text-green-700" :
+                      color === "amber" ? "bg-amber-100 text-amber-700" :
+                      color === "blue" ? "bg-blue-100 text-blue-700" :
+                      "bg-slate-200 text-slate-600"
+                    }`}>{tag}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">{note}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex flex-col sm:flex-row gap-3">
               <div className="flex-1 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">
                 <p className="text-xs text-amber-800 leading-relaxed">
                   <span className="font-semibold">Educational tool only.</span>{" "}

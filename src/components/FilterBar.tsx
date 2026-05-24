@@ -12,8 +12,10 @@ interface FilterBarProps {
 const SIGNAL_TYPES: (SignalType | "All")[] = [
   "All",
   "Corporate Insider",
-  "Government Official",
-  "Hedge Fund",
+  "Congress — Senate",
+  "Congress — House",
+  "Fund Manager / 13F",
+  "Executive Branch",
   "Activist Investor",
 ];
 
@@ -38,8 +40,8 @@ const PRESETS: { label: string; state: FilterState }[] = [
     state: { ...DEFAULT_FILTERS, label: "Exceptional Signal" },
   },
   {
-    label: "Gov officials",
-    state: { ...DEFAULT_FILTERS, signalType: "Government Official" },
+    label: "Congress",
+    state: { ...DEFAULT_FILTERS, signalType: "Congress — Senate" },
   },
   {
     label: "Corp insiders",

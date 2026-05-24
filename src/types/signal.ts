@@ -1,10 +1,25 @@
 export type SignalType =
-  | "Corporate Insider"
+  | "Corporate Insider"   // SEC Form 4
+  | "Congress — Senate"   // Senate eFD PTR (STOCK Act)
+  | "Congress — House"    // House Clerk PTR (STOCK Act)
+  | "Fund Manager / 13F"  // SEC Form 13F — quarterly institutional holdings
+  | "Executive Branch"    // OGE Form 278e / 278-T — annual/transaction disclosure
+  // Legacy values kept for mock-data backward compatibility
   | "Government Official"
   | "Hedge Fund"
   | "Activist Investor";
 
 export type TradeType = "Buy" | "Sell";
+
+/**
+ * How fresh this record is.
+ * Used for UI labelling and disclaimer display.
+ */
+export type DataFreshness =
+  | "Live"              // fetched from an API at build time
+  | "Quarterly"         // SEC 13F — 45 days after quarter-end by law
+  | "Sample"            // representative data; live fetch not yet available
+  | "Manual document";  // sourced from a public PDF / official document
 
 export type RecentPerformance =
   | "Strong recent outperformance"
@@ -39,6 +54,10 @@ export interface SignalEntry {
   historicalTradeCount: number;
   recentPerformance: RecentPerformance;
   explanation?: string;
+  /** How fresh this data is — shown as a label in the UI */
+  dataFreshness?: DataFreshness;
+  /** Link to the official public disclosure document or source page */
+  reportUrl?: string;
 }
 
 export interface ComputedSignal extends SignalEntry {

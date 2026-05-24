@@ -6,24 +6,33 @@ import type {
 } from "@/types/signal";
 
 const SIGNAL_STRENGTH_MAP: Record<string, number> = {
+  // Corporate Insider — Form 4
   "CEO open-market buy": 40,
   "CFO open-market buy": 38,
   "Director open-market buy": 30,
   "Cluster insider buying": 40,
   "Insider sell": 10,
+  // Congress — Senate / House
   "Relevant committee trade": 35,
   "Large congressional purchase": 30,
   "Multiple officials buying same sector": 35,
   "Spouse/advisor trade": 15,
   "Government official sell": 10,
+  "House member purchase": 28,
+  "House member sell": 10,
+  // Fund Manager / 13F
   "High-performing fund new position": 35,
   "Major position increase": 30,
   "Multiple respected funds buying": 35,
   "Generic 13F holding": 15,
+  // Activist
   "New 13D activist filing": 40,
   "Activist increasing stake": 35,
   "Clear activist campaign": 38,
   "Passive 13G filing": 15,
+  // Executive Branch — OGE 278e / 278-T
+  "Executive branch annual disclosure": 12,
+  "Executive transaction report (278-T)": 20,
 };
 
 const CONTEXT_BONUS_MAP: Record<string, number> = {
