@@ -5,6 +5,7 @@ import { Fragment, useMemo, useState } from "react";
 import type { ComputedSignal } from "@/types/signal";
 import type { SortDirection, SortKey } from "@/lib/utils";
 import { formatCurrency, formatDate, sortSignals } from "@/lib/utils";
+import { getSignalScoreBreakdown } from "@/lib/scoring";
 import ScoreBadge from "./ScoreBadge";
 
 interface SignalTableProps {
@@ -213,7 +214,8 @@ export default function SignalTable({ signals }: SignalTableProps) {
                       <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">
                         {s.explanation ?? buildExplanation(s)}
                       </p>
-                      <div className="mt-2 flex items-center gap-4">
+                      <MiniScoreBreakdown signal={s} />
+                      <div className="mt-3 flex items-center gap-4">
                         <Link
                           href={`/signal/${s.id}`}
                           className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
@@ -311,9 +313,10 @@ export default function SignalTable({ signals }: SignalTableProps) {
               {expandedId === s.id && (
                 <div className="px-4 pb-4 text-xs text-slate-600 leading-relaxed">
                   <p>{s.explanation ?? buildExplanation(s)}</p>
+                  <MiniScoreBreakdown signal={s} />
                   <Link
                     href={`/signal/${s.id}`}
-                    className="mt-2 inline-block text-blue-600 font-medium hover:underline"
+                    className="mt-3 inline-block text-blue-600 font-medium hover:underline text-xs"
                   >
                     Full score breakdown →
                   </Link>
@@ -328,5 +331,127 @@ export default function SignalTable({ signals }: SignalTableProps) {
         </p>
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mini score breakdown — shown in expanded rows (desktop + mobile)
+// ---------------------------------------------------------------------------
+
+const SIG_BARS: {
+  label: string;
+  key: "strength" | "conviction" | "freshness" | "bonus" | "penalty";
+  max: number;
+  negative: boolean;
+  tip: string;
+}[] = [
+  {
+    label: "Source quality",
+    key: "strength",
+    max: 40,
+    negative: false,
+    tip: "Based on who filed and what type of disclosure this is",
+  },
+  {
+    label: "Trade conviction",
+    key: "conviction",
+    max: 20,
+    negative: false,
+    tip: "Based on the reported trade size",
+  },
+  {
+    label: "Filing recency",
+    key: "freshness",
+    max: 15,
+    negative: false,
+    tip: "Days between the trade and the filing date",
+  },
+  {
+    label: "Context factors",
+    key: "bonus",
+    max: 15,
+    negative: false,
+    tip: "Supporting signals e.g. cluster buying, committee relevance",
+  },
+  {
+    label: "Risk deductions",
+    key: "penalty",
+    max: 20,
+    negative: true,
+    tip: "Penalties for risk flags e.g. debt, litigation, stale filing",
+  },
+];
+
+function MiniBar({
+  label,
+  value,
+  max,
+  negative,
+  tip,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  negative: boolean;
+  tip: string;
+}) {
+  const pct = Math.round(Math.min(100, (value / max) * 100));
+  return (
+    <div title={tip}>
+      <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+        <span>{label}</span>
+        <span className="tabular-nums font-mono">
+          {negative ? "−" : ""}
+          {value}/{max}
+        </span>
+      </div>
+      <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${
+            negative ? "bg-rose-400" : "bg-blue-500"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MiniScoreBreakdown({ signal }: { signal: ComputedSignal }) {
+  const sig = getSignalScoreBreakdown(signal);
+
+  return (
+    <div className="mt-4">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">
+        Score breakdown
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2.5">
+        {SIG_BARS.map(({ label, key, max, negative, tip }) => (
+          <MiniBar
+            key={key}
+            label={label}
+            value={sig[key]}
+            max={max}
+            negative={negative}
+            tip={tip}
+          />
+        ))}
+        <MiniBar
+          label="Track record"
+          value={signal.trackRecordScore}
+          max={100}
+          negative={false}
+          tip="Historical performance of this filer on similar disclosures"
+        />
+      </div>
+
+      <p className="mt-3 text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 leading-relaxed">
+        <span className="font-medium text-slate-500">Limitations:</span> Does
+        not account for company valuation, earnings expectations, or macro
+        conditions. Does not guarantee future returns. For educational research
+        only.
+      </p>
+    </div>
   );
 }
