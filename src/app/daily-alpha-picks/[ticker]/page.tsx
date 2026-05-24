@@ -14,15 +14,14 @@ interface PageProps {
   params: { ticker: string };
 }
 
-export function generateStaticParams() {
-  return getDailyAlphaPicks().all.map((p) => ({
-    ticker: encodeURIComponent(p.ticker),
-  }));
+export async function generateStaticParams() {
+  const { all } = await getDailyAlphaPicks();
+  return all.map((p) => ({ ticker: encodeURIComponent(p.ticker) }));
 }
 
-export function generateMetadata({ params }: PageProps): Metadata {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const ticker = decodeURIComponent(params.ticker);
-  const pick = getDailyAlphaPickByTicker(ticker);
+  const pick = await getDailyAlphaPickByTicker(ticker);
   if (!pick) return { title: "Daily Alpha Pick" };
   return {
     title: `${pick.ticker} — Daily Alpha Pick · ${pick.scoreLabel}`,
@@ -30,9 +29,9 @@ export function generateMetadata({ params }: PageProps): Metadata {
   };
 }
 
-export default function DailyAlphaPickDetailPage({ params }: PageProps) {
+export default async function DailyAlphaPickDetailPage({ params }: PageProps) {
   const ticker = decodeURIComponent(params.ticker);
-  const pick = getDailyAlphaPickByTicker(ticker);
+  const pick = await getDailyAlphaPickByTicker(ticker);
   if (!pick) notFound();
 
   return (

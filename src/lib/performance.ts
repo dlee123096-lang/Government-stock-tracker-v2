@@ -1,25 +1,15 @@
 /**
  * Performance enrichment — replaces synthetic Track Record defaults with real
- * post-filing returns derived from Yahoo Finance.
+ * post-filing returns derived from Yahoo Finance, and computes per-entry
+ * price/alpha data shown in the dashboard expanded rows.
  *
- * Strategy
- *   1. Collect every unique ticker in the live signal set.
- *   2. Fetch one 1-year daily chart from Yahoo per ticker (cached 24 h).
- *   3. For every signal whose filingDate falls inside that window, compute
- *      the return from the filing date to "today" (or filingDate + 30 days,
- *      whichever is sooner). For sells we invert the sign — a price drop
- *      after a sell is a "win".
- *   4. Group by personEntity. A filer is only updated when they have at
- *      least 2 measurable disclosures; otherwise the synthetic baseline
- *      stays in place (and the UI shows the existing amber disclosure note).
+ * Single pass: price history is fetched once per unique ticker and reused for
+ * both filer-level aggregation and per-entry return computation.
  *
  * No paid APIs. No accumulated history file. Pure read-only at build time.
  */
 
-import type {
-  RecentPerformance,
-  SignalEntry,
-} from "@/types/signal";
+import type { RecentPerformance, SignalEntry } from "@/types/signal";
 
 const YAHOO_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 const USER_AGENT =
@@ -30,11 +20,26 @@ interface PricePoint {
   close: number;
 }
 
-interface FilerPerformance {
+export interface FilerPerformance {
   alpha: number;
   winRate: number;
   tradeCount: number;
   recent: RecentPerformance;
+}
+
+/** Per-entry post-filing return data, attached to ComputedSignal. */
+export interface EntryReturn {
+  returnSinceFiling: number;
+  sp500ReturnSinceFiling: number;
+  alphaSinceFiling: number;
+}
+
+/** Combined output of a single price-data pass. */
+export interface PerformanceBuildResult {
+  /** Filer-level aggregates (require ≥2 measurable trades). */
+  filerMap: Map<string, FilerPerformance>;
+  /** Per-entry returns, keyed by entry.id. */
+  entryReturns: Map<string, EntryReturn>;
 }
 
 async function fetchYahooChart(ticker: string): Promise<PricePoint[] | null> {
@@ -42,8 +47,7 @@ async function fetchYahooChart(ticker: string): Promise<PricePoint[] | null> {
     const url = `${YAHOO_BASE}/${encodeURIComponent(ticker)}?range=1y&interval=1d`;
     const res = await fetch(url, {
       headers: { "User-Agent": USER_AGENT },
-      // 24-hour cache — daily GitHub Actions rebuild busts this anyway.
-      next: { revalidate: 86_400 },
+      next: { revalidate: 86_400 }, // 24-hour cache
     });
     if (!res.ok) return null;
     const json = (await res.json()) as {
@@ -74,7 +78,7 @@ async function fetchYahooChart(ticker: string): Promise<PricePoint[] | null> {
 function closestPriceAt(
   points: PricePoint[],
   isoDate: string,
-): { ts: number; close: number } | null {
+): PricePoint | null {
   const target = new Date(isoDate + "T12:00:00Z").getTime() / 1000;
   let best: PricePoint | null = null;
   let bestDiff = Infinity;
@@ -90,6 +94,22 @@ function closestPriceAt(
   return best;
 }
 
+function closestPriceAtTarget(
+  points: PricePoint[],
+  targetSec: number,
+): PricePoint | null {
+  let best: PricePoint | null = null;
+  let bestDiff = Infinity;
+  for (const p of points) {
+    const d = Math.abs(p.ts - targetSec);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
 function bucketRecent(avgReturn: number): RecentPerformance {
   if (avgReturn >= 8) return "Strong recent outperformance";
   if (avgReturn >= 2) return "Moderate recent outperformance";
@@ -98,15 +118,13 @@ function bucketRecent(avgReturn: number): RecentPerformance {
 }
 
 /**
- * Build a per-filer performance map from live entries + price history.
- * Filers with fewer than 2 measurable trades are omitted (caller keeps
- * their synthetic defaults).
+ * Single-pass build of both filer-level performance aggregates and per-entry
+ * return data. Price history is fetched once per unique ticker.
  */
-export async function buildFilerPerformance(
+export async function buildPerformanceData(
   entries: SignalEntry[],
-): Promise<Map<string, FilerPerformance>> {
-  // Skip OGE annual disclosures (tradeDate is a year-end snapshot, not a real
-  // entry point) and House sample data.
+): Promise<PerformanceBuildResult> {
+  // Skip OGE annual disclosures and House sample data
   const measurable = entries.filter(
     (e) =>
       e.tradeSize > 0 &&
@@ -116,11 +134,10 @@ export async function buildFilerPerformance(
   );
 
   const uniqueTickers = Array.from(
-    new Set(measurable.map((e) => e.ticker)),
+    new Set([...measurable.map((e) => e.ticker), "SPY"]),
   ).filter((t) => t && t !== "—");
 
-  // Bulk fetch — 1 Yahoo call per ticker. Concurrency cap of 6 keeps us
-  // friendly to Yahoo and inside Vercel build's network budget.
+  // Bulk-fetch price history — concurrency cap of 6
   const tickerPrices = new Map<string, PricePoint[]>();
   const concurrency = 6;
   for (let i = 0; i < uniqueTickers.length; i += concurrency) {
@@ -133,47 +150,62 @@ export async function buildFilerPerformance(
     }
   }
 
-  // Group measurable returns by filer
+  const spyPrices = tickerPrices.get("SPY") ?? null;
+
   const filerReturns = new Map<string, number[]>();
+  const entryReturns = new Map<string, EntryReturn>();
+
   const nowSec = Math.floor(Date.now() / 1000);
   const horizonSec = 30 * 86_400;
 
   for (const e of measurable) {
     const prices = tickerPrices.get(e.ticker);
     if (!prices) continue;
-    const entry = closestPriceAt(prices, e.tradeDate);
-    if (!entry) continue;
 
-    // Use trade_date + 30d if that's already in the past; otherwise today
-    const exitTarget = Math.min(entry.ts + horizonSec, nowSec);
-    if (exitTarget <= entry.ts + 86_400) continue; // need at least 1 day to evaluate
-    let exit: PricePoint | null = null;
-    let exitDiff = Infinity;
-    for (const p of prices) {
-      const d = Math.abs(p.ts - exitTarget);
-      if (d < exitDiff) {
-        exitDiff = d;
-        exit = p;
-      }
-    }
-    if (!exit) continue;
+    const entryPt = closestPriceAt(prices, e.tradeDate);
+    if (!entryPt) continue;
 
-    const rawPct = ((exit.close - entry.close) / entry.close) * 100;
-    // For sells, a price drop counts as a successful disclosure (the seller
-    // got out before the decline).
+    const exitTarget = Math.min(entryPt.ts + horizonSec, nowSec);
+    if (exitTarget <= entryPt.ts + 86_400) continue;
+
+    const exitPt = closestPriceAtTarget(prices, exitTarget);
+    if (!exitPt) continue;
+
+    const rawPct = ((exitPt.close - entryPt.close) / entryPt.close) * 100;
     const signed = e.tradeType === "Sell" ? -rawPct : rawPct;
+
+    // Filer-level tracking
     const arr = filerReturns.get(e.personEntity) ?? [];
     arr.push(signed);
     filerReturns.set(e.personEntity, arr);
+
+    // Per-entry tracking (stock vs SPY over same window)
+    let sp500Pct = 0;
+    if (spyPrices) {
+      const spyEntry = closestPriceAt(spyPrices, e.tradeDate);
+      const spyExit = spyEntry
+        ? closestPriceAtTarget(spyPrices, exitTarget)
+        : null;
+      if (spyEntry && spyExit) {
+        sp500Pct =
+          ((spyExit.close - spyEntry.close) / spyEntry.close) * 100;
+      }
+    }
+
+    entryReturns.set(e.id, {
+      returnSinceFiling: Number(rawPct.toFixed(1)),
+      sp500ReturnSinceFiling: Number(sp500Pct.toFixed(1)),
+      alphaSinceFiling: Number((rawPct - sp500Pct).toFixed(1)),
+    });
   }
 
-  // Aggregate per filer (require ≥2 measurable disclosures)
-  const out = new Map<string, FilerPerformance>();
+  // Aggregate filer-level (require ≥2 measurable trades)
+  const filerMap = new Map<string, FilerPerformance>();
   for (const [filer, returns] of filerReturns) {
     if (returns.length < 2) continue;
     const avg = returns.reduce((a, b) => a + b, 0) / returns.length;
     const wins = returns.filter((r) => r > 0).length;
-    out.set(filer, {
+    filerMap.set(filer, {
       alpha: Number(avg.toFixed(1)),
       winRate: Math.round((wins / returns.length) * 100),
       tradeCount: returns.length,
@@ -181,19 +213,19 @@ export async function buildFilerPerformance(
     });
   }
 
-  return out;
+  return { filerMap, entryReturns };
 }
 
 /**
- * Apply the filer-performance map to a list of entries, replacing the
- * neutral track-record defaults with measured values where available.
+ * Apply the filer-performance map to entries, replacing neutral track-record
+ * defaults with measured values where available.
  */
 export function applyFilerPerformance(
   entries: SignalEntry[],
-  perf: Map<string, FilerPerformance>,
+  filerMap: Map<string, FilerPerformance>,
 ): SignalEntry[] {
   return entries.map((e) => {
-    const p = perf.get(e.personEntity);
+    const p = filerMap.get(e.personEntity);
     if (!p) return e;
     return {
       ...e,
@@ -203,4 +235,12 @@ export function applyFilerPerformance(
       recentPerformance: p.recent,
     };
   });
+}
+
+/** Legacy single-return wrapper kept for callers that only need filer data. */
+export async function buildFilerPerformance(
+  entries: SignalEntry[],
+): Promise<Map<string, FilerPerformance>> {
+  const { filerMap } = await buildPerformanceData(entries);
+  return filerMap;
 }

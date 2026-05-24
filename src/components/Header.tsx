@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 
+const NAV_LINKS = [
+  { href: "/", label: "Home" },
+  { href: "/dashboard", label: "Government Disclosures" },
+  { href: "/daily-alpha-picks", label: "Daily Alpha" },
+  { href: "/officials", label: "Officials" },
+  { href: "/model-portfolio", label: "Portfolio" },
+  { href: "/glossary", label: "Glossary" },
+] as const;
+
 export default function Header() {
   const [open, setOpen] = useState(false);
 
@@ -37,114 +46,49 @@ export default function Header() {
             </span>
           </Link>
 
+          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-5 lg:gap-6">
-            <Link
-              href="/"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Government Disclosures
-            </Link>
-            <Link
-              href="/daily-alpha-picks"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Daily Alpha Picks
-            </Link>
-            <Link
-              href="/model-portfolio"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Model Portfolio
-            </Link>
-            <Link
-              href="/glossary"
-              className="text-sm font-medium text-gray-500 hover:text-gray-800"
-            >
-              Glossary
-            </Link>
+            {NAV_LINKS.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                {label}
+              </Link>
+            ))}
           </nav>
 
+          {/* Mobile hamburger */}
           <button
             type="button"
             className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             onClick={() => setOpen(!open)}
             aria-label="Toggle navigation"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {open ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               )}
             </svg>
           </button>
         </div>
 
+        {/* Mobile nav — same items as desktop */}
         {open && (
-          <nav className="md:hidden pb-4 flex flex-col gap-2">
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/dashboard"
-              onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Government Disclosures
-            </Link>
-            <Link
-              href="/daily-alpha-picks"
-              onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Daily Alpha Picks
-            </Link>
-            <Link
-              href="/model-portfolio"
-              onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Model Portfolio
-            </Link>
-            <Link
-              href="/officials"
-              onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-500 hover:bg-gray-100"
-            >
-              Officials
-            </Link>
-            <Link
-              href="/glossary"
-              onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-500 hover:bg-gray-100"
-            >
-              Glossary
-            </Link>
+          <nav className="md:hidden pb-4 flex flex-col gap-1">
+            {NAV_LINKS.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                {label}
+              </Link>
+            ))}
           </nav>
         )}
       </div>

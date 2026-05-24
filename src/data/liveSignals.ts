@@ -6,7 +6,7 @@ import { fetchForm13fSignals } from "@/lib/form13f";
 import { fetchHouseSignals } from "@/lib/house";
 import {
   applyFilerPerformance,
-  buildFilerPerformance,
+  buildPerformanceData,
 } from "@/lib/performance";
 import { ogeComputedSignals } from "@/data/ogeSignals";
 import type { ComputedSignal } from "@/types/signal";
@@ -77,12 +77,16 @@ const fetchLiveSignals = unstable_cache(
     // Enrich Track Record with real Yahoo-derived returns where filers have
     // ≥2 measurable disclosures in the dataset. Filers with too little
     // history keep their neutral defaults (the UI shows an amber note).
+    // Also computes per-entry returnSinceFiling / sp500ReturnSinceFiling / alphaSinceFiling.
     let enriched = liveEntries;
+    let entryReturns = new Map<string, { returnSinceFiling: number; sp500ReturnSinceFiling: number; alphaSinceFiling: number }>();
     try {
-      const perf = await buildFilerPerformance(liveEntries);
-      enriched = applyFilerPerformance(liveEntries, perf);
+      const perfData = await buildPerformanceData(liveEntries);
+      enriched = applyFilerPerformance(liveEntries, perfData.filerMap);
+      entryReturns = perfData.entryReturns;
       console.log(
-        `Track record enrichment: ${perf.size} filer(s) updated with real post-filing returns`,
+        `Track record enrichment: ${perfData.filerMap.size} filer(s) updated with real post-filing returns, ` +
+          `${perfData.entryReturns.size} entries with per-filing price data`,
       );
     } catch (err) {
       console.error(
@@ -92,7 +96,11 @@ const fetchLiveSignals = unstable_cache(
     }
 
     const allComputed = [
-      ...enriched.map(computeFullSignal),
+      ...enriched.map((e) => {
+        const cs = computeFullSignal(e);
+        const er = entryReturns.get(e.id);
+        return er ? { ...cs, ...er } : cs;
+      }),
       ...ogeEntries, // already computed
     ];
 

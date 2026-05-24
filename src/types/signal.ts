@@ -62,4 +62,10 @@ export interface ComputedSignal extends SignalEntry {
   trackRecordScore: number;
   totalOpportunityScore: number;
   label: ScoreLabel;
+  /** % price change from filing date to today (30-day cap). Live signals only. */
+  returnSinceFiling?: number;
+  /** SPY % change over the same window. */
+  sp500ReturnSinceFiling?: number;
+  /** returnSinceFiling − sp500ReturnSinceFiling */
+  alphaSinceFiling?: number;
 }

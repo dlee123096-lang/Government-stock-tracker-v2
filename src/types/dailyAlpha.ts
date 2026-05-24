@@ -106,9 +106,13 @@ export interface DailyAlphaPickInput {
   pickedOn: string;
 }
 
+export type NewsSource = "Live GDELT" | "Mock fallback" | "No articles found";
+
 export interface DailyAlphaPick extends DailyAlphaPickInput {
   dailyAlphaScore: number;
   scoreLabel: DailyAlphaLabel;
+  /** Where the supporting articles came from — used for the badge on the page. */
+  newsSource: NewsSource;
 }
 
 export type DailyAlphaSortKey =

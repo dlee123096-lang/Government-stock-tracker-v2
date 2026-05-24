@@ -121,6 +121,9 @@ export function computeFullDailyAlphaPick(
     ...input,
     dailyAlphaScore,
     scoreLabel,
+    // newsSource is set by getDailyAlphaPicks after GDELT enrichment;
+    // default to mock fallback so pre-enriched objects are always valid.
+    newsSource: input.supportingArticles.length > 0 ? "Mock fallback" : "No articles found",
   };
 }
 
