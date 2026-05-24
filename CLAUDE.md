@@ -72,9 +72,21 @@ URL slug: `official-name.toLowerCase().replace(/\s+/g, "-")` (e.g., `nancy-pelos
 `generateStaticParams()` pre-generates pages for all names in `OFFICIALS`.
 Page body does a normalized slug comparison (not naive `split("-").map(capitalize)`) to correctly handle mixed-case names like "McHenry".
 
+### Stock price charts (`src/components/StockChart.tsx` + `src/app/api/stock/[ticker]/route.ts`)
+
+`StockChart` is a `"use client"` component rendered on signal detail pages. Architecture:
+
+- **API proxy** at `/api/stock/[ticker]` fetches `https://query1.finance.yahoo.com/v8/finance/chart/{ticker}` server-side (avoids browser CORS), with `next: { revalidate: 300 }` (5-min cache) and a browser-like `User-Agent`. Returns 502 on upstream failure.
+- **Range→interval map**: `{ "1d":"2m", "5d":"15m", "1mo":"1d", "6mo":"1d", "ytd":"1d", "1y":"1d", "5y":"1wk", "max":"1mo" }`.
+- **`parseYahooResponse()`** extracts `timestamps[]` and `closes[]` from the Yahoo v8 JSON structure, filtering out `null` close values.
+- **`useMemo` geometry**: all SVG path strings (`linePath`, `fillPath`), y-axis label prices, and the `tradeIdx` (nearest timestamp to `tradeDate`, nulled if >7 days away) are computed once when `data` or `tradeDate` changes.
+- **SVG**: `viewBox="0 0 800 180"` with `preserveAspectRatio="none"` on an absolute-positioned layer inside a relative div. Y-axis labels are HTML (not SVG text) to avoid distortion from `preserveAspectRatio="none"`.
+- **Trade date marker**: amber (`#F59E0B`) dashed vertical line + filled circle at the closest data point. Shows "Bought"/"Sold" legend below the chart.
+- Props: `ticker: string`, `tradeDate?: string` (ISO date), `tradeType?: "Buy" | "Sell"`.
+
 ### Signal detail page (`src/app/signal/[id]/page.tsx`)
 
-Now `async`. Fast path: checks `mockComputedSignals` first (pre-generated at build time). If the ID is not in mock data (i.e., it's a live EDGAR or Congress signal), falls through to `await getSignals()` and looks up by id. Government official signals show a committee assignments panel and a link to `/official/[name]`.
+Now `async`. Fast path: checks `mockComputedSignals` first (pre-generated at build time). If the ID is not in mock data (i.e., it's a live EDGAR or Congress signal), falls through to `await getSignals()` and looks up by id. Renders `<StockChart>` below the header card, followed by the committee assignments panel (government officials only) and score breakdown.
 
 ### EDGAR client (`src/lib/edgar.ts`)
 
@@ -92,6 +104,7 @@ Page files (`app/*/page.tsx`) are server components — `dashboard/page.tsx` is 
 - `SignalTable.tsx` — owns sort state, `useMemo` re-sorts on prop or state change
 - `FilterBar.tsx` — fully controlled via `onFiltersChange` prop
 - `Header.tsx` — owns mobile menu toggle
+- `StockChart.tsx` — owns range selector state, fetches from `/api/stock/[ticker]`, renders SVG chart
 
 ### Types (`src/types/signal.ts`)
 
@@ -116,5 +129,7 @@ Page files (`app/*/page.tsx`) are server components — `dashboard/page.tsx` is 
 
 - **V1**: mock data only (`src/data/mockSignals.ts`)
 - **V2**: live EDGAR Form 4 insider data (`src/lib/edgar.ts` + `src/data/liveSignals.ts`)
-- **V3**: Congress STOCK Act disclosures via Senate eFD API + committee relevance scoring + official profile pages ← current
-- **V4–V5**: 13F/13D hedge fund data, historical price performance, watchlists — documented in `README.md`. Do not implement without explicit instruction.
+- **V3**: Congress STOCK Act disclosures via Senate eFD API + committee relevance scoring + official profile pages
+- **V4**: Bloomberg-lite UI refresh — summary cards, expandable rows, muted Buy/Sell badges, mobile card layout
+- **V5**: SVG logo + favicon, SEO metadata, Yahoo Finance stock price charts on signal detail pages ← current
+- **V6+**: 13F/13D hedge fund data, watchlists, email alerts, backtesting — do not implement without explicit instruction.
