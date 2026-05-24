@@ -74,9 +74,19 @@ export default async function SignalDetailPage({ params }: PageProps) {
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold text-gray-900">
-                {signal.ticker}
-              </h1>
+              {signal.ticker && signal.ticker !== "—" ? (
+                <Link
+                  href={`/ticker/${encodeURIComponent(signal.ticker)}`}
+                  className="text-3xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+                  title={`See all disclosures for ${signal.ticker}`}
+                >
+                  {signal.ticker}
+                </Link>
+              ) : (
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {signal.ticker}
+                </h1>
+              )}
               <ScoreBadge label={signal.label} size="md" />
             </div>
             <p className="mt-1 text-gray-600">{signal.company}</p>
@@ -86,6 +96,14 @@ export default async function SignalDetailPage({ params }: PageProps) {
               </span>{" "}
               · {signal.signalSubtype}
             </p>
+            {signal.ticker && signal.ticker !== "—" && (
+              <Link
+                href={`/ticker/${encodeURIComponent(signal.ticker)}`}
+                className="mt-2 inline-flex items-center text-xs font-medium text-blue-600 hover:text-blue-800"
+              >
+                See all {signal.ticker} disclosures →
+              </Link>
+            )}
           </div>
           <div className="text-right">
             <div className="text-xs uppercase tracking-wide text-gray-500">

@@ -4,6 +4,10 @@ import { fetchEdgarSignals } from "@/lib/edgar";
 import { fetchCongressSignals } from "@/lib/congress";
 import { fetchForm13fSignals } from "@/lib/form13f";
 import { fetchHouseSignals } from "@/lib/house";
+import {
+  applyFilerPerformance,
+  buildFilerPerformance,
+} from "@/lib/performance";
 import { ogeComputedSignals } from "@/data/ogeSignals";
 import type { ComputedSignal } from "@/types/signal";
 import { computedSignals as mockSignals } from "./mockSignals";
@@ -63,9 +67,32 @@ const fetchLiveSignals = unstable_cache(
     // OGE is always static — no async fetch needed
     const ogeEntries = ogeComputedSignals;
 
-    const liveEntries = [...edgarEntries, ...congressEntries, ...form13fEntries, ...houseEntries];
+    const liveEntries = [
+      ...edgarEntries,
+      ...congressEntries,
+      ...form13fEntries,
+      ...houseEntries,
+    ];
+
+    // Enrich Track Record with real Yahoo-derived returns where filers have
+    // ≥2 measurable disclosures in the dataset. Filers with too little
+    // history keep their neutral defaults (the UI shows an amber note).
+    let enriched = liveEntries;
+    try {
+      const perf = await buildFilerPerformance(liveEntries);
+      enriched = applyFilerPerformance(liveEntries, perf);
+      console.log(
+        `Track record enrichment: ${perf.size} filer(s) updated with real post-filing returns`,
+      );
+    } catch (err) {
+      console.error(
+        "Performance enrichment failed — keeping synthetic defaults:",
+        err,
+      );
+    }
+
     const allComputed = [
-      ...liveEntries.map(computeFullSignal),
+      ...enriched.map(computeFullSignal),
       ...ogeEntries, // already computed
     ];
 
@@ -94,7 +121,7 @@ const fetchLiveSignals = unstable_cache(
       isLive: false,
     };
   },
-  ["signal-alpha-live-signals-v6"],
+  ["signal-alpha-live-signals-v7"],
   { revalidate: 14_400 },
 );
 

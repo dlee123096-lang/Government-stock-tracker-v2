@@ -56,6 +56,12 @@ export default function Header() {
             >
               Officials
             </Link>
+            <Link
+              href="/glossary"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              Glossary
+            </Link>
           </nav>
 
           <button
@@ -111,6 +117,13 @@ export default function Header() {
               className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
               Officials
+            </Link>
+            <Link
+              href="/glossary"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Glossary
             </Link>
           </nav>
         )}

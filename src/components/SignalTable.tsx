@@ -141,17 +141,27 @@ export default function SignalTable({ signals }: SignalTableProps) {
                     {idx + 1}
                   </td>
                   <td className="px-3 py-3.5">
-                    <Link
-                      href={`/signal/${s.id}`}
-                      className="block group"
-                    >
-                      <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        {s.ticker}
+                    {s.ticker && s.ticker !== "—" ? (
+                      <Link
+                        href={`/ticker/${encodeURIComponent(s.ticker)}`}
+                        className="block group"
+                        title={`See all disclosures for ${s.ticker}`}
+                      >
+                        <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {s.ticker}
+                        </div>
+                        <div className="text-xs text-slate-400 truncate max-w-[160px] mt-0.5">
+                          {s.company}
+                        </div>
+                      </Link>
+                    ) : (
+                      <div>
+                        <div className="font-semibold text-slate-500">—</div>
+                        <div className="text-xs text-slate-400 truncate max-w-[160px] mt-0.5">
+                          {s.company}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400 truncate max-w-[160px] mt-0.5">
-                        {s.company}
-                      </div>
-                    </Link>
+                    )}
                   </td>
                   <td className="px-3 py-3.5 text-slate-500 text-xs whitespace-nowrap">
                     {s.signalType}
@@ -253,12 +263,16 @@ export default function SignalTable({ signals }: SignalTableProps) {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-400">#{idx + 1}</span>
-                    <Link
-                      href={`/signal/${s.id}`}
-                      className="font-bold text-slate-900 hover:text-blue-600 transition-colors"
-                    >
-                      {s.ticker}
-                    </Link>
+                    {s.ticker && s.ticker !== "—" ? (
+                      <Link
+                        href={`/ticker/${encodeURIComponent(s.ticker)}`}
+                        className="font-bold text-slate-900 hover:text-blue-600 transition-colors"
+                      >
+                        {s.ticker}
+                      </Link>
+                    ) : (
+                      <span className="font-bold text-slate-500">—</span>
+                    )}
                     <span
                       className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ring-1 ${
                         s.tradeType === "Buy"

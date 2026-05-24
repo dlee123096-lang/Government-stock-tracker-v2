@@ -103,16 +103,25 @@ function xAxisLabels(timestamps: number[], range: Range): string[] {
 const W = 800;
 const H = 180;
 
+export interface ChartMarker {
+  date: string;
+  type: "Buy" | "Sell";
+  label?: string;
+}
+
 interface StockChartProps {
   ticker: string;
   tradeDate?: string;
   tradeType?: "Buy" | "Sell";
+  /** Multiple markers — overrides tradeDate/tradeType when provided. */
+  markers?: ChartMarker[];
 }
 
 export default function StockChart({
   ticker,
   tradeDate,
   tradeType,
+  markers,
 }: StockChartProps) {
   const [range, setRange] = useState<Range>("1Y");
   const [data, setData] = useState<ChartData | null>(null);
@@ -176,24 +185,44 @@ export default function StockChart({
     // Y-axis label prices
     const yLabels = [hi, (hi + lo) / 2, lo];
 
-    // Trade date marker index
-    let tradeIdx: number | null = null;
-    if (tradeDate) {
-      const tradeDateSec = new Date(tradeDate + "T12:00:00Z").getTime() / 1000;
+    // Helper: find nearest-timestamp index for any ISO date string
+    const findIdx = (iso: string): number | null => {
+      const target = new Date(iso + "T12:00:00Z").getTime() / 1000;
       let closest = Infinity;
+      let idx: number | null = null;
       timestamps.forEach((ts, i) => {
-        const diff = Math.abs(ts - tradeDateSec);
+        const diff = Math.abs(ts - target);
         if (diff < closest) {
           closest = diff;
-          tradeIdx = i;
+          idx = i;
         }
       });
       // Only mark if within 7 days of an actual data point
-      if (closest > 7 * 24 * 3600) tradeIdx = null;
-    }
+      if (closest > 7 * 24 * 3600) return null;
+      return idx;
+    };
 
-    return { xOf, yOf, linePath, fillPath, yLabels, tradeIdx, n };
-  }, [data, tradeDate]);
+    // Single-trade marker (existing single-signal detail pages)
+    const tradeIdx = tradeDate ? findIdx(tradeDate) : null;
+
+    // Multi-marker array (per-ticker page)
+    type ResolvedMarker = {
+      idx: number;
+      type: "Buy" | "Sell";
+      label: string | undefined;
+    };
+    const markerPoints: ResolvedMarker[] =
+      markers && markers.length > 0
+        ? markers
+            .map((m): ResolvedMarker | null => {
+              const idx = findIdx(m.date);
+              return idx === null ? null : { idx, type: m.type, label: m.label };
+            })
+            .filter((m): m is ResolvedMarker => m !== null)
+        : [];
+
+    return { xOf, yOf, linePath, fillPath, yLabels, tradeIdx, markerPoints, n };
+  }, [data, tradeDate, markers]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -360,28 +389,48 @@ export default function StockChart({
                   strokeWidth="1.5"
                 />
 
-                {/* Trade date marker (amber dashed) */}
-                {geo.tradeIdx !== null && (
-                  <>
-                    <line
-                      x1={geo.xOf(geo.tradeIdx).toFixed(1)}
-                      y1="0"
-                      x2={geo.xOf(geo.tradeIdx).toFixed(1)}
-                      y2={H}
-                      stroke="#F59E0B"
-                      strokeWidth="1.5"
-                      strokeDasharray="5,4"
-                    />
-                    <circle
-                      cx={geo.xOf(geo.tradeIdx).toFixed(1)}
-                      cy={geo.yOf(data.closes[geo.tradeIdx]).toFixed(1)}
-                      r="4"
-                      fill="#F59E0B"
-                      stroke="white"
-                      strokeWidth="1.5"
-                    />
-                  </>
-                )}
+                {/* Multi-marker mode (per-ticker page): one dot per disclosure */}
+                {geo.markerPoints.length > 0
+                  ? geo.markerPoints.map((m, mi) => {
+                      const color = m.type === "Buy" ? "#10B981" : "#F43F5E";
+                      return (
+                        <circle
+                          key={mi}
+                          cx={geo.xOf(m.idx).toFixed(1)}
+                          cy={geo.yOf(data.closes[m.idx]).toFixed(1)}
+                          r="4"
+                          fill={color}
+                          stroke="white"
+                          strokeWidth="1.5"
+                        >
+                          <title>
+                            {m.type === "Buy" ? "Bought" : "Sold"}
+                            {m.label ? ` — ${m.label}` : ""}
+                          </title>
+                        </circle>
+                      );
+                    })
+                  : geo.tradeIdx !== null && (
+                      <>
+                        <line
+                          x1={geo.xOf(geo.tradeIdx).toFixed(1)}
+                          y1="0"
+                          x2={geo.xOf(geo.tradeIdx).toFixed(1)}
+                          y2={H}
+                          stroke="#F59E0B"
+                          strokeWidth="1.5"
+                          strokeDasharray="5,4"
+                        />
+                        <circle
+                          cx={geo.xOf(geo.tradeIdx).toFixed(1)}
+                          cy={geo.yOf(data.closes[geo.tradeIdx]).toFixed(1)}
+                          r="4"
+                          fill="#F59E0B"
+                          stroke="white"
+                          strokeWidth="1.5"
+                        />
+                      </>
+                    )}
 
                 {/* Hover crosshair */}
                 {hoveredIdx !== null && (
@@ -418,8 +467,26 @@ export default function StockChart({
             ))}
           </div>
 
-          {/* Trade date legend */}
-          {geo.tradeIdx !== null && tradeDate && (
+          {/* Multi-marker legend */}
+          {geo.markerPoints.length > 0 && (
+            <div className="pl-14 pr-2 mt-2 flex items-center gap-4 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-sm" />
+                Buy disclosure
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white shadow-sm" />
+                Sell disclosure
+              </span>
+              <span className="text-xs text-slate-400">
+                {geo.markerPoints.length} disclosure
+                {geo.markerPoints.length === 1 ? "" : "s"} in window
+              </span>
+            </div>
+          )}
+
+          {/* Trade date legend (single-trade mode) */}
+          {geo.markerPoints.length === 0 && geo.tradeIdx !== null && tradeDate && (
             <div className="pl-14 pr-2 mt-2 flex items-center gap-2">
               <svg width="20" height="8" aria-hidden>
                 <line
