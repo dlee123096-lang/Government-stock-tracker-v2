@@ -37,28 +37,34 @@ export default function Header() {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-5 lg:gap-6">
             <Link
               href="/"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Home
-            </Link>
-            <Link
-              href="/dashboard"
               className="text-sm font-medium text-gray-700 hover:text-gray-900"
             >
               Dashboard
             </Link>
             <Link
-              href="/officials"
+              href="/dashboard"
               className="text-sm font-medium text-gray-700 hover:text-gray-900"
             >
-              Officials
+              Government Disclosures
+            </Link>
+            <Link
+              href="/daily-alpha-picks"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              Daily Alpha Picks
+            </Link>
+            <Link
+              href="/model-portfolio"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              Model Portfolio
             </Link>
             <Link
               href="/glossary"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="text-sm font-medium text-gray-500 hover:text-gray-800"
             >
               Glossary
             </Link>
@@ -102,26 +108,40 @@ export default function Header() {
               onClick={() => setOpen(false)}
               className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              Home
+              Dashboard
             </Link>
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
               className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              Dashboard
+              Government Disclosures
+            </Link>
+            <Link
+              href="/daily-alpha-picks"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Daily Alpha Picks
+            </Link>
+            <Link
+              href="/model-portfolio"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Model Portfolio
             </Link>
             <Link
               href="/officials"
               onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="px-3 py-2 rounded text-sm font-medium text-gray-500 hover:bg-gray-100"
             >
               Officials
             </Link>
             <Link
               href="/glossary"
               onClick={() => setOpen(false)}
-              className="px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="px-3 py-2 rounded text-sm font-medium text-gray-500 hover:bg-gray-100"
             >
               Glossary
             </Link>

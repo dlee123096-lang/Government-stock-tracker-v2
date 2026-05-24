@@ -10,10 +10,62 @@ SignalAlpha is an educational research tool that scores publicly disclosed stock
 
 ## What it does
 
-- **Ranks stock signals** using a Signal Score (0–100) and Track Record Score (0–100), combined into a Total Opportunity Score
-- **Filterable dashboard** with sort, search, and filter controls across 5 disclosure source types
-- **Detail pages** for each signal with stock price chart, full score breakdown, and plain-English explanation
-- **Score labels** from "Weak Signal" up to "Exceptional Signal"
+- **Government Disclosures dashboard** ranks every public-filing signal (insiders, Congress, fund managers, executive branch, activists) with a transparent Signal Score, Track Record Score, and Total Opportunity Score
+- **Daily Alpha Picks** ranks the top 10 and top 20 daily *research candidates* using a separate eight-factor formula that combines disclosure data, trusted news, momentum, fundamentals, valuation, earnings revisions, freshness, and historical track record — with risk penalty deductions
+- **Per-ticker pages** aggregate every disclosure for a single stock
+- **Per-official pages** show committee assignments and disclosure history
+- **Filterable, sortable, mobile-responsive** across every view
+
+## Daily Alpha Picks
+
+`/daily-alpha-picks` is a daily-ranked research list. Each candidate gets a
+0–100 **Daily Alpha Score** computed by `src/lib/dailyAlphaScoring.ts`:
+
+```
+Daily Alpha Score
+  = 20% News Catalyst
+  + 20% Disclosure Signal
+  + 15% Momentum
+  + 15% Fundamental Quality
+  + 10% Valuation
+  + 10% Earnings Revision
+  +  5% Freshness
+  +  5% Track Record
+  −  Risk Penalty
+```
+
+Labels: **Exceptional (90+) · High-Conviction (80+) · Strong Research (70+) · Watchlist (60+) · Low Priority (<60)**.
+
+The Top 10 are displayed as detailed cards (with bull/bear cases, supporting
+headlines, performance vs S&P 500, and risk flags). The Top 20 appears as a
+sortable watchlist table.
+
+| File | What it holds |
+| --- | --- |
+| `src/data/mockDailyAlphaPicks.ts` | 40+ mock candidates with full metadata |
+| `src/lib/dailyAlphaScoring.ts` | Pure scoring functions and label thresholds |
+| `src/lib/getDailyAlphaPicks.ts` | Data service: load → score → sort → top 10 / top 20 |
+| `src/lib/newsSources.ts` | Trust score registry for news outlets |
+| `src/lib/newsAdapters.ts` | Disabled-by-default free news API adapters |
+
+**Why "research candidate" language:** Signal Alpha Stock is an educational
+research tool. We deliberately never describe a pick as a "buy" or "sell."
+Picks are inputs to your own research process — see the full disclaimer on
+every page.
+
+### Replacing mock article data with live news later
+
+`src/lib/newsAdapters.ts` ships four pre-wired free-tier adapters (GDELT,
+Alpha Vantage, Finnhub, Financial Modeling Prep). Each returns `[]` unless
+its environment variable is set, so the build never breaks. To activate:
+
+1. Sign up for the provider's free tier and copy the API key
+2. Set the matching env var in `.env.local` (locally) and in your Vercel
+   project settings (production)
+3. In `src/lib/getDailyAlphaPicks.ts`, call the adapter and merge results
+   into the `supportingArticles` array for each pick
+
+See `COST_CONTROL.md` for the full policy on which APIs are allowed.
 
 ## Data sources
 
