@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OFFICIALS, COMMITTEE_SECTOR_MAP } from "@/data/committees";
@@ -11,6 +12,18 @@ export function generateStaticParams() {
 
 interface PageProps {
   params: { name: string };
+}
+
+export function generateMetadata({ params }: PageProps): Metadata {
+  const entry = Object.entries(OFFICIALS).find(
+    ([name]) => name.toLowerCase().replace(/\s+/g, "-") === params.name,
+  );
+  if (!entry) return { title: "Official Not Found" };
+  const [fullName, info] = entry;
+  return {
+    title: fullName,
+    description: `STOCK Act disclosure profile for ${fullName}, ${info.title}. View committee assignments and tracked congressional financial disclosures.`,
+  };
 }
 
 export default function OfficialPage({ params }: PageProps) {

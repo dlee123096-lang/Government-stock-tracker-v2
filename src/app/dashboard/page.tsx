@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import DashboardClient from "@/components/DashboardClient";
 import { getSignals } from "@/data/liveSignals";
+
+export const metadata: Metadata = {
+  title: "Signal Dashboard",
+  description:
+    "Browse and filter ranked STOCK Act congressional financial disclosures and SEC Form 4 insider trades from members of Congress, corporate executives, and institutional investors.",
+};
 
 export default async function DashboardPage() {
   const { signals, lastUpdated, isLive } = await getSignals();

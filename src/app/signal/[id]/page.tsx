@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ScoreBadge from "@/components/ScoreBadge";
@@ -17,6 +18,15 @@ export function generateStaticParams() {
 
 interface PageProps {
   params: { id: string };
+}
+
+export function generateMetadata({ params }: PageProps): Metadata {
+  const signal = mockComputedSignals.find((s) => s.id === params.id);
+  if (!signal) return { title: "Signal Detail" };
+  return {
+    title: `${signal.ticker} — ${signal.label}`,
+    description: `${signal.tradeType} of ${signal.ticker} (${signal.company}) by ${signal.personEntity}. Total Opportunity Score: ${signal.totalOpportunityScore}/100. ${signal.signalSubtype}. Filed ${signal.filingDate}.`,
+  };
 }
 
 export default async function SignalDetailPage({ params }: PageProps) {

@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { OFFICIALS } from "@/data/committees";
+
+export const metadata: Metadata = {
+  title: "Tracked Officials",
+  description:
+    "U.S. senators and representatives tracked for STOCK Act periodic transaction reports. View committee assignments and congressional financial disclosure activity.",
+};
 
 const CHAMBER_STYLES = {
   Senate:

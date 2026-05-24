@@ -8,18 +8,24 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="max-w-3xl">
             <div className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold mb-4 ring-1 ring-blue-200">
-              SignalAlpha · Version 3 · Live SEC &amp; STOCK Act data
+              SignalAlpha · Live SEC EDGAR &amp; STOCK Act data
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-              Track public market disclosures.{" "}
+              Track congressional stock trades and public market disclosures.{" "}
               <span className="text-blue-600">
                 Rank information-advantaged signals.
               </span>
             </h1>
             <p className="mt-5 text-lg text-gray-600 leading-relaxed">
-              Discover stocks with strong public-data signals from insiders,
-              government officials, hedge funds, and activist investors — ranked
-              by a transparent, repeatable scoring system.
+              Browse STOCK Act disclosures from members of Congress, SEC Form 4
+              insider filings from corporate executives, and institutional
+              position reports — all scored by a transparent, public-data model.
+            </p>
+            <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+              Built for researchers, journalists, and curious investors who want
+              to track congressional financial disclosures and corporate insider
+              activity in one place. All data is sourced from public SEC EDGAR
+              and STOCK Act filings.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -123,7 +129,7 @@ export default function HomePage() {
               },
               {
                 title: "Government Officials",
-                desc: "Members of Congress and senior officials filing under the STOCK Act.",
+                desc: "Members of Congress filing periodic transaction reports under the STOCK Act (congressional financial disclosures).",
               },
               {
                 title: "Hedge Funds",
@@ -154,7 +160,7 @@ export default function HomePage() {
           Ready to explore the signals?
         </h2>
         <p className="mt-2 text-gray-600">
-          Browse the ranked dashboard of sample disclosures.
+          Browse the ranked dashboard of congressional financial disclosures and insider trades.
         </p>
         <Link
           href="/dashboard"

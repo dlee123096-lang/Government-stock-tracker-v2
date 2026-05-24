@@ -179,6 +179,20 @@ The scoring logic in `src/lib/scoring.ts` is completely pure — it works on any
 
 ---
 
+## SEO launch checklist
+
+After deploying to Vercel and connecting a custom domain, complete these steps to get indexed by Google:
+
+1. **Set your canonical URL** — add `NEXT_PUBLIC_SITE_URL=https://yourdomain.com` as an environment variable in Vercel (Project Settings → Environment Variables). This populates `robots.txt` and `sitemap.xml` with the correct base URL.
+2. **Submit to Google Search Console** — go to [search.google.com/search-console](https://search.google.com/search-console), add your property, and verify ownership.
+3. **Submit your sitemap** — in Search Console, go to Sitemaps and enter `https://yourdomain.com/sitemap.xml`.
+4. **Request indexing** — use the URL Inspection tool in Search Console on your homepage and click "Request Indexing."
+5. **Check indexing** — after a few days, run `site:yourdomain.com` in Google to see which pages are indexed.
+6. **Add a custom domain** — in Vercel → Project → Domains, add your domain. Google indexes custom domains faster than `.vercel.app` subdomains.
+7. **Share for discovery** — post the link on GitHub (pin the repo), Reddit (r/investing, r/stockmarket, r/DataIsBeautiful), X/Twitter, and LinkedIn to build backlinks.
+
+---
+
 ## Disclaimer
 
 This website is for educational and research purposes only. It does not provide financial advice, investment recommendations, or buy/sell signals. Public disclosures may be delayed, incomplete, or inaccurate. Always do your own research or consult a licensed financial advisor before making investment decisions.

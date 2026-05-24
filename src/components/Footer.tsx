@@ -14,7 +14,7 @@ export default function Footer() {
             financial advisor before making investment decisions.
           </p>
           <p className="mt-3 text-gray-400">
-            SignalAlpha Version 1 — Sample/mock data only.
+            SignalAlpha — Data sourced from public SEC EDGAR and STOCK Act disclosures. Not affiliated with any government agency.
           </p>
         </div>
       </div>
