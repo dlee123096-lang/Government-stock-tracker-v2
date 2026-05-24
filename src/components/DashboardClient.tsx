@@ -33,7 +33,7 @@ const SCORE_GUIDE = [
   {
     term: "Rating",
     range: "Label",
-    desc: "Human-readable summary: Exceptional (90+), Very Strong (75+), Strong (60+), Watchlist (40+), Weak (below 40).",
+    desc: "Plain-English bucket from the Total Score: Exceptional (90+), Very Strong (75+), Strong (60+), Moderate (40+), Low (below 40).",
   },
   {
     term: "Source Type",
@@ -153,8 +153,8 @@ export default function DashboardClient({
                     <span className="font-semibold text-slate-700">
                       Sample data mode.
                     </span>{" "}
-                    Live SEC EDGAR data was unavailable at build time. Showing
-                    illustrative sample disclosures.
+                    Live public filings (EDGAR, Senate eFD, 13F) returned too
+                    few entries this build. Showing illustrative samples.
                   </p>
                 </div>
               )}

@@ -4,10 +4,7 @@ export type SignalType =
   | "Congress — House"    // House Clerk PTR (STOCK Act)
   | "Fund Manager / 13F"  // SEC Form 13F — quarterly institutional holdings
   | "Executive Branch"    // OGE Form 278e / 278-T — annual/transaction disclosure
-  // Legacy values kept for mock-data backward compatibility
-  | "Government Official"
-  | "Hedge Fund"
-  | "Activist Investor";
+  | "Activist Investor";  // SEC 13D / 13G
 
 export type TradeType = "Buy" | "Sell";
 
@@ -28,11 +25,11 @@ export type RecentPerformance =
   | "Poor recent performance";
 
 export type ScoreLabel =
-  | "Exceptional Signal"
-  | "Very Strong Signal"
-  | "Strong Signal"
-  | "Watchlist Signal"
-  | "Weak Signal";
+  | "Exceptional"
+  | "Very Strong"
+  | "Strong"
+  | "Moderate"
+  | "Low";
 
 export interface SignalEntry {
   id: string;

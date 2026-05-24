@@ -157,11 +157,26 @@ export function computeTotalOpportunityScore(
 }
 
 export function computeLabel(totalScore: number): ScoreLabel {
-  if (totalScore >= 90) return "Exceptional Signal";
-  if (totalScore >= 75) return "Very Strong Signal";
-  if (totalScore >= 60) return "Strong Signal";
-  if (totalScore >= 40) return "Watchlist Signal";
-  return "Weak Signal";
+  if (totalScore >= 90) return "Exceptional";
+  if (totalScore >= 75) return "Very Strong";
+  if (totalScore >= 60) return "Strong";
+  if (totalScore >= 40) return "Moderate";
+  return "Low";
+}
+
+/**
+ * Live data sources (EDGAR, Senate eFD, 13F) do not yet supply real historical
+ * performance. They use these neutral defaults until a price-history feed is
+ * wired up. The UI uses this flag to disclose that Track Record is not
+ * personalized for these entries.
+ */
+export function isSyntheticTrackRecord(entry: SignalEntry): boolean {
+  return (
+    entry.historicalAlpha === 5.0 &&
+    entry.historicalWinRate === 52 &&
+    entry.historicalTradeCount === 5 &&
+    entry.recentPerformance === "Neutral recent performance"
+  );
 }
 
 export function computeFullSignal(entry: SignalEntry): ComputedSignal {

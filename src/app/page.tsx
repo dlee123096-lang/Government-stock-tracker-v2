@@ -118,26 +118,30 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">
-              Four sources of public-data signal
+              Five sources of public-data signal
             </h2>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               {
                 title: "Corporate Insiders",
-                desc: "CEOs, CFOs, directors filing open-market purchases via SEC Form 4.",
+                desc: "CEOs, CFOs, directors filing open-market trades via SEC Form 4.",
               },
               {
-                title: "Government Officials",
-                desc: "Members of Congress filing periodic transaction reports under the STOCK Act (congressional financial disclosures).",
+                title: "Congress — Senate & House",
+                desc: "Members of Congress filing Periodic Transaction Reports under the STOCK Act.",
               },
               {
-                title: "Hedge Funds",
-                desc: "Institutional positions disclosed via quarterly 13F filings.",
+                title: "Fund Managers / 13F",
+                desc: "Institutional managers (Berkshire, Pershing Square, Third Point, Appaloosa) disclosing quarterly holdings.",
+              },
+              {
+                title: "Executive Branch",
+                desc: "White House and Cabinet officials' OGE 278e and 278-T public disclosures.",
               },
               {
                 title: "Activist Investors",
-                desc: "Activist campaigns and >5% stakes disclosed via 13D/13G.",
+                desc: "Activist campaigns and >5% stakes disclosed via 13D / 13G.",
               },
             ].map((t) => (
               <div

@@ -88,10 +88,14 @@ export default function SummaryCards({
             }`}
           />
           <span className="text-sm font-semibold text-slate-800">
-            {isLive ? "Live · SEC EDGAR" : "Sample data"}
+            {isLive ? "Live · public filings" : "Sample data"}
           </span>
         </div>
-        <div className="mt-1 text-xs text-slate-400">refreshed {updatedAt}</div>
+        <div className="mt-1 text-xs text-slate-400">
+          {isLive
+            ? `refreshed ${updatedAt}`
+            : "live fetch unavailable — see legend"}
+        </div>
       </div>
     </div>
   );

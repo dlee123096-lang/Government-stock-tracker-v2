@@ -23,11 +23,11 @@ const TRADE_TYPES: (TradeType | "All")[] = ["All", "Buy", "Sell"];
 
 const LABELS: (ScoreLabel | "All")[] = [
   "All",
-  "Exceptional Signal",
-  "Very Strong Signal",
-  "Strong Signal",
-  "Watchlist Signal",
-  "Weak Signal",
+  "Exceptional",
+  "Very Strong",
+  "Strong",
+  "Moderate",
+  "Low",
 ];
 
 const PRESETS: { label: string; state: FilterState }[] = [
@@ -37,7 +37,7 @@ const PRESETS: { label: string; state: FilterState }[] = [
   },
   {
     label: "Top rated",
-    state: { ...DEFAULT_FILTERS, label: "Exceptional Signal" },
+    state: { ...DEFAULT_FILTERS, label: "Exceptional" },
   },
   {
     label: "Congress",
@@ -48,8 +48,8 @@ const PRESETS: { label: string; state: FilterState }[] = [
     state: { ...DEFAULT_FILTERS, signalType: "Corporate Insider" },
   },
   {
-    label: "Watchlist",
-    state: { ...DEFAULT_FILTERS, label: "Watchlist Signal" },
+    label: "Moderate+",
+    state: { ...DEFAULT_FILTERS, label: "Moderate" },
   },
 ];
 

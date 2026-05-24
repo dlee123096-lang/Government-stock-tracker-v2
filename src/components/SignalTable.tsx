@@ -236,7 +236,8 @@ export default function SignalTable({ signals }: SignalTableProps) {
 
         {/* Table footer disclaimer */}
         <div className="px-4 py-3 border-t border-slate-100 text-xs text-slate-400">
-          Educational tool only — not financial advice. Data from public disclosures (SEC EDGAR, STOCK Act).
+          Educational tool only — not financial advice. Data from public
+          filings (SEC EDGAR Form 4 &amp; 13F, Senate eFD, OGE 278e).
         </div>
       </div>
 

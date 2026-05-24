@@ -1,12 +1,11 @@
 import type { ScoreLabel } from "@/types/signal";
 
 const LABEL_STYLES: Record<ScoreLabel, string> = {
-  "Exceptional Signal":
-    "bg-purple-100 text-purple-800 ring-1 ring-purple-300",
-  "Very Strong Signal": "bg-blue-100 text-blue-800 ring-1 ring-blue-300",
-  "Strong Signal": "bg-green-100 text-green-800 ring-1 ring-green-300",
-  "Watchlist Signal": "bg-amber-100 text-amber-800 ring-1 ring-amber-300",
-  "Weak Signal": "bg-gray-100 text-gray-600 ring-1 ring-gray-300",
+  Exceptional: "bg-purple-100 text-purple-800 ring-1 ring-purple-300",
+  "Very Strong": "bg-blue-100 text-blue-800 ring-1 ring-blue-300",
+  Strong: "bg-green-100 text-green-800 ring-1 ring-green-300",
+  Moderate: "bg-amber-100 text-amber-800 ring-1 ring-amber-300",
+  Low: "bg-gray-100 text-gray-600 ring-1 ring-gray-300",
 };
 
 interface ScoreBadgeProps {

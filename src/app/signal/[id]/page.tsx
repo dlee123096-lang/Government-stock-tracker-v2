@@ -43,10 +43,9 @@ export default async function SignalDetailPage({ params }: PageProps) {
 
   if (!signal) notFound();
 
-  const officialInfo =
-    signal.signalType === "Government Official"
-      ? OFFICIALS[signal.personEntity]
-      : undefined;
+  // Render the committee panel for any official we have profile data for,
+  // regardless of which chamber the signal came from.
+  const officialInfo = OFFICIALS[signal.personEntity];
 
   const officialSlug = signal.personEntity
     .toLowerCase()
@@ -102,11 +101,7 @@ export default async function SignalDetailPage({ params }: PageProps) {
           <DetailField
             label="Person / Entity"
             value={signal.personEntity}
-            href={
-              signal.signalType === "Government Official"
-                ? `/official/${officialSlug}`
-                : undefined
-            }
+            href={officialInfo ? `/official/${officialSlug}` : undefined}
           />
           <DetailField label="Role" value={signal.role} />
           <DetailField

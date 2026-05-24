@@ -3,6 +3,7 @@ import {
   getSignalScoreBreakdown,
   getTrackRecordBreakdown,
   computeTotalOpportunityScore,
+  isSyntheticTrackRecord,
 } from "@/lib/scoring";
 
 interface ScoreBreakdownProps {
@@ -43,6 +44,7 @@ export default function ScoreBreakdown({ entry }: ScoreBreakdownProps) {
   const sig = getSignalScoreBreakdown(entry);
   const track = getTrackRecordBreakdown(entry);
   const total = computeTotalOpportunityScore(sig.total, track.total);
+  const syntheticTrackRecord = isSyntheticTrackRecord(entry);
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -88,6 +90,14 @@ export default function ScoreBreakdown({ entry }: ScoreBreakdownProps) {
             {track.total} / 100
           </span>
         </div>
+        {syntheticTrackRecord && (
+          <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-3 py-2 leading-relaxed">
+            <span className="font-semibold">Note:</span> This filer&apos;s
+            historical performance is not yet available from a free price-history
+            source, so Track Record uses neutral baseline values. The Signal
+            Score above is the meaningful differentiator for this entry.
+          </p>
+        )}
       </div>
 
       <div className="md:col-span-2 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-5">
@@ -106,6 +116,23 @@ export default function ScoreBreakdown({ entry }: ScoreBreakdownProps) {
             <span className="text-lg font-normal text-gray-500"> / 100</span>
           </div>
         </div>
+      </div>
+
+      <div className="md:col-span-2 bg-slate-50 border border-slate-200 rounded-lg p-5">
+        <h3 className="text-sm font-semibold text-slate-700 mb-2">
+          What this score does NOT account for
+        </h3>
+        <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600 leading-relaxed">
+          <li>• Company valuation (P/E, P/S, EV/EBITDA)</li>
+          <li>• Forward earnings expectations or guidance risk</li>
+          <li>• Macro conditions (rates, inflation, recession risk)</li>
+          <li>• Liquidity and bid-ask spread</li>
+          <li>• Your personal portfolio, tax situation, or time horizon</li>
+          <li>• Future stock performance — past patterns don&apos;t predict returns</li>
+        </ul>
+        <p className="mt-3 text-xs text-slate-500 italic">
+          Educational research only. Not a buy, sell, or hold recommendation.
+        </p>
       </div>
     </div>
   );

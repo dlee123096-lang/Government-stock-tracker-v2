@@ -103,19 +103,3 @@ export function sortSignals(
   return copy;
 }
 
-export function topSignalType(signals: ComputedSignal[]): SignalType | "—" {
-  if (signals.length === 0) return "—";
-  const counts = new Map<SignalType, number>();
-  for (const s of signals) {
-    counts.set(s.signalType, (counts.get(s.signalType) ?? 0) + 1);
-  }
-  let best: SignalType | null = null;
-  let max = -1;
-  for (const [type, count] of counts) {
-    if (count > max) {
-      max = count;
-      best = type;
-    }
-  }
-  return best ?? "—";
-}
