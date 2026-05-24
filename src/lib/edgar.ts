@@ -2,9 +2,9 @@ import type { SignalEntry } from "@/types/signal";
 
 const EDGAR_SUBMISSIONS = "https://data.sec.gov/submissions";
 const EDGAR_ARCHIVES = "https://www.sec.gov/Archives/edgar/data";
-// SEC requires a User-Agent header identifying your app and contact info
+// SEC policy requires a descriptive User-Agent on every request
 const USER_AGENT =
-  "SignalAlpha/2.0 (Educational research tool; https://github.com/dlee123096-lang/Government-stock-tracker-v2)";
+  "SignalAlphaStock/2.0 (Educational research tool; https://signal-alpha-stock.vercel.app)";
 
 interface WatchedCompany {
   ticker: string;
@@ -12,40 +12,59 @@ interface WatchedCompany {
   company: string;
 }
 
-// Top AI / tech / finance companies to watch for insider Form 4 filings
+// Top tech / finance companies to watch for open-market insider Form 4 filings
 export const WATCHED_COMPANIES: WatchedCompany[] = [
   { ticker: "NVDA", cik: "0001045810", company: "NVIDIA Corp." },
-  { ticker: "AMD", cik: "0000002488", company: "Advanced Micro Devices Inc." },
+  { ticker: "AMD",  cik: "0000002488", company: "Advanced Micro Devices Inc." },
   { ticker: "AAPL", cik: "0000320193", company: "Apple Inc." },
   { ticker: "MSFT", cik: "0000789019", company: "Microsoft Corp." },
   { ticker: "META", cik: "0001326801", company: "Meta Platforms Inc." },
   { ticker: "AMZN", cik: "0001018724", company: "Amazon.com Inc." },
-  { ticker: "GOOGL", cik: "0001652044", company: "Alphabet Inc." },
+  { ticker: "GOOGL",cik: "0001652044", company: "Alphabet Inc." },
   { ticker: "PLTR", cik: "0001321655", company: "Palantir Technologies Inc." },
   { ticker: "AVGO", cik: "0001730168", company: "Broadcom Inc." },
   { ticker: "QCOM", cik: "0000804328", company: "Qualcomm Inc." },
   { ticker: "TSLA", cik: "0001318605", company: "Tesla Inc." },
-  { ticker: "JPM", cik: "0000019617", company: "JPMorgan Chase & Co." },
-  { ticker: "SMCI", cik: "0000310764", company: "Super Micro Computer Inc." },
+  { ticker: "JPM",  cik: "0000019617", company: "JPMorgan Chase & Co." },
+  { ticker: "SMCI", cik: "0001375365", company: "Super Micro Computer Inc." },
   { ticker: "DELL", cik: "0000826083", company: "Dell Technologies Inc." },
-  { ticker: "CRM", cik: "0001108524", company: "Salesforce Inc." },
+  { ticker: "CRM",  cik: "0001108524", company: "Salesforce Inc." },
   { ticker: "INTC", cik: "0000050863", company: "Intel Corp." },
 ];
 
 // -- XML helpers ----------------------------------------------------------
 
+/**
+ * Extract a scalar value from EDGAR Form 4 XML.
+ *
+ * EDGAR uses two formats depending on whether a footnote is present:
+ *   Simple:   <tag>VALUE</tag>
+ *   Wrapped:  <tag>
+ *               <value>VALUE</value>
+ *               <footnoteId id="F1"/>   ← optional
+ *             </tag>
+ *
+ * The original single-line regex failed on the wrapped format because
+ * whitespace and sibling elements break both the direct and <value> patterns.
+ * This version extracts the full block between <tag> and </tag> first, then
+ * looks for <value> inside it, falling back to plain text content.
+ */
 function extractXmlValue(xml: string, tag: string): string {
-  // EDGAR XML wraps values in <tag><value>...</value></tag> or just <tag>...</tag>
-  const withValue = new RegExp(
-    `<${tag}><value>([^<]*)<\\/value><\\/${tag}>`,
-    "i",
+  // Step 1 — extract the raw block between the opening and closing tag.
+  // [\s\S]*? handles multi-line content and is safe on small Form 4 XMLs.
+  const blockMatch = xml.match(
+    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"),
   );
-  const plain = new RegExp(`<${tag}>([^<]*)<\\/${tag}>`, "i");
-  return (
-    xml.match(withValue)?.[1]?.trim() ??
-    xml.match(plain)?.[1]?.trim() ??
-    ""
-  );
+  if (!blockMatch) return "";
+
+  const block = blockMatch[1];
+
+  // Step 2a — prefer <value>CONTENT</value> if present
+  const valueMatch = block.match(/<value>([^<]*)<\/value>/i);
+  if (valueMatch) return valueMatch[1].trim();
+
+  // Step 2b — plain text: strip any stray child tags, return remaining text
+  return block.replace(/<[^>]+>/g, "").trim();
 }
 
 function officerTitleToSubtype(
@@ -64,7 +83,7 @@ function officerTitleToSubtype(
     return "CEO open-market buy";
   if (t.includes("chief financial") || t === "cfo")
     return "CFO open-market buy";
-  return "Director open-market buy"; // default for directors / other officers
+  return "Director open-market buy";
 }
 
 interface ParsedForm4 {
@@ -77,6 +96,11 @@ interface ParsedForm4 {
   tradeDateStr: string;
 }
 
+function isHtmlContent(text: string): boolean {
+  const head = text.trimStart().slice(0, 300).toLowerCase();
+  return head.includes("<!doctype html") || head.startsWith("<html");
+}
+
 function parseForm4XML(xml: string): ParsedForm4 | null {
   const ticker = extractXmlValue(xml, "issuerTradingSymbol");
   const issuerName = extractXmlValue(xml, "issuerName");
@@ -84,10 +108,9 @@ function parseForm4XML(xml: string): ParsedForm4 | null {
   const officerTitle = extractXmlValue(xml, "officerTitle");
   const isDirector = extractXmlValue(xml, "isDirector") === "1";
 
-  // Transaction code: P = open-market purchase, S = sale
-  // We skip A (award), M (option exercise), etc.
-  const txCodeMatch = xml.match(/<transactionCode>([^<]+)<\/transactionCode>/i);
-  const txCode = txCodeMatch?.[1]?.trim().toUpperCase() ?? "";
+  // Only process open-market purchases (P) and sales (S)
+  // Skip awards (A), option exercises (M), etc.
+  const txCode = extractXmlValue(xml, "transactionCode").toUpperCase();
   if (!["P", "S"].includes(txCode)) return null;
 
   const shares = parseFloat(extractXmlValue(xml, "transactionShares")) || 0;
@@ -100,9 +123,7 @@ function parseForm4XML(xml: string): ParsedForm4 | null {
   if (!rptOwnerName || !ticker) return null;
 
   const tradeType: "Buy" | "Sell" = txCode === "P" ? "Buy" : "Sell";
-  const role =
-    officerTitle ||
-    (isDirector ? "Director" : "Officer");
+  const role = officerTitle || (isDirector ? "Director" : "Officer");
   const tradeDateStr = extractXmlValue(xml, "transactionDate");
 
   return { ticker, issuerName, rptOwnerName, role, tradeType, tradeSize, tradeDateStr };
@@ -110,11 +131,19 @@ function parseForm4XML(xml: string): ParsedForm4 | null {
 
 // -- Network helpers ------------------------------------------------------
 
-async function edgarFetch(url: string): Promise<Response> {
-  return fetch(url, {
-    headers: { "User-Agent": USER_AGENT },
-    next: { revalidate: 0 },
-  });
+/** Fetch from EDGAR with required User-Agent + 8-second abort timeout. */
+async function edgarFetch(url: string, cacheSeconds = 0): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    return await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: controller.signal,
+      next: { revalidate: cacheSeconds },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -125,6 +154,52 @@ function stripLeadingZeros(cik: string): string {
 
 function accessionToPath(accession: string): string {
   return accession.replace(/-/g, "");
+}
+
+/**
+ * Attempt to retrieve the Form 4 XML text for a given accession.
+ *
+ * EDGAR's submissions API often returns primaryDocument with an XSLT viewer
+ * prefix, e.g. "xslF345X06/wk-form4_12345.xml". That path serves the
+ * HTML-rendered view. The actual machine-readable XML lives in the accession
+ * root without the prefix. We strip any leading xsl…/ segment first.
+ *
+ * If the resolved document still returns HTML (some filers use .htm wrappers),
+ * we also try substituting the .xml extension.
+ */
+async function fetchFilingXml(
+  cikNum: string,
+  accPath: string,
+  primaryDoc: string,
+): Promise<string | null> {
+  const base = `${EDGAR_ARCHIVES}/${cikNum}/${accPath}`;
+
+  // Strip EDGAR XSLT viewer prefix (e.g. "xslF345X06/") — the raw XML is
+  // always in the accession root, not the xsl subdirectory.
+  const stripped = primaryDoc.replace(/^xsl[A-Za-z0-9]+\//, "");
+
+  // Build an ordered list of names to try
+  const candidates: string[] = [stripped];
+
+  if (/\.html?$/i.test(stripped)) {
+    candidates.push(stripped.replace(/\.html?$/i, ".xml"));
+    candidates.push("form4.xml");
+  }
+
+  for (const name of candidates) {
+    try {
+      const res = await edgarFetch(`${base}/${name}`);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text.trim().startsWith("<")) continue;
+      if (isHtmlContent(text)) continue;
+      return text; // valid XML
+    } catch {
+      // timeout or network error — try next candidate
+    }
+  }
+
+  return null;
 }
 
 // -- Submissions API types ------------------------------------------------
@@ -152,15 +227,20 @@ export async function fetchEdgarSignals(): Promise<SignalEntry[]> {
 
   for (const co of WATCHED_COMPANIES) {
     try {
+      // Cache submissions index for 1 hour — it changes rarely
       const res = await edgarFetch(
         `${EDGAR_SUBMISSIONS}/CIK${co.cik}.json`,
+        3600,
       );
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.warn(`EDGAR: submissions ${co.ticker} → HTTP ${res.status}`);
+        continue;
+      }
 
       const data: SubmissionsJSON = await res.json();
       const recent = data.filings.recent;
 
-      // Find indices of Form 4s filed in the last 30 days
+      // Collect indices of Form 4s filed within the lookback window
       const indices: number[] = [];
       for (let i = 0; i < recent.form.length; i++) {
         if (recent.form[i] === "4" && recent.filingDate[i] >= cutoffStr) {
@@ -168,43 +248,63 @@ export async function fetchEdgarSignals(): Promise<SignalEntry[]> {
         }
       }
 
-      // Process up to 3 most recent Form 4s per company
+      if (indices.length === 0) {
+        console.log(`EDGAR: ${co.ticker} — no Form 4s in last 30 days`);
+        continue;
+      }
+
+      console.log(
+        `EDGAR: ${co.ticker} — ${indices.length} Form 4(s) found, processing up to 3`,
+      );
+
+      // Process at most 3 most-recent Form 4s per company
       for (const idx of indices.slice(0, 3)) {
-        await delay(110); // Stay well under SEC's 10 req/sec limit
+        await delay(110); // Stay well under SEC's 10 req/sec fair-access limit
 
         const cikNum = stripLeadingZeros(co.cik);
         const accPath = accessionToPath(recent.accessionNumber[idx]);
-        const docUrl = `${EDGAR_ARCHIVES}/${cikNum}/${accPath}/${recent.primaryDocument[idx]}`;
+        const primaryDoc = recent.primaryDocument[idx];
 
-        const docRes = await edgarFetch(docUrl);
-        if (!docRes.ok) continue;
-
-        const xml = await docRes.text();
-
-        // Skip HTML responses (some primaryDocuments are .htm wrappers)
-        if (!xml.trim().startsWith("<") || xml.includes("<!DOCTYPE html")) {
+        const xml = await fetchFilingXml(cikNum, accPath, primaryDoc);
+        if (!xml) {
+          console.log(
+            `EDGAR: ${co.ticker} acc=${recent.accessionNumber[idx]} — no XML found (primaryDoc: ${primaryDoc})`,
+          );
           continue;
         }
 
-        const parsed = parseForm4XML(xml);
-        if (!parsed) continue;
+        let parsed: ParsedForm4 | null = null;
+        try {
+          parsed = parseForm4XML(xml);
+        } catch (e) {
+          console.warn(`EDGAR: XML parse error for ${co.ticker}:`, e);
+          continue;
+        }
+
+        if (!parsed) {
+          // Filtered out (non-P/S code, zero price, small trade, etc.)
+          continue;
+        }
 
         const filingDate = recent.filingDate[idx];
         const tradeDate = parsed.tradeDateStr || recent.reportDate[idx];
-        const filingDateObj = new Date(filingDate);
-        const tradeDateObj = new Date(tradeDate);
         const daysDelayed = Math.max(
           0,
           Math.round(
-            (filingDateObj.getTime() - tradeDateObj.getTime()) /
-              (1000 * 60 * 60 * 24),
+            (new Date(filingDate).getTime() - new Date(tradeDate).getTime()) /
+              86_400_000,
           ),
         );
 
-        const signalSubtype = officerTitleToSubtype(parsed.role, parsed.tradeType);
-        const uniqueId = `${parsed.ticker}-${recent.accessionNumber[idx].replace(/-/g, "").slice(-8)}`;
+        const signalSubtype = officerTitleToSubtype(
+          parsed.role,
+          parsed.tradeType,
+        );
+        const uniqueId = `${parsed.ticker}-${recent.accessionNumber[idx]
+          .replace(/-/g, "")
+          .slice(-8)}`;
 
-        const entry: SignalEntry = {
+        results.push({
           id: uniqueId,
           ticker: parsed.ticker || co.ticker,
           company: parsed.issuerName || co.company,
@@ -219,22 +319,29 @@ export async function fetchEdgarSignals(): Promise<SignalEntry[]> {
           signalSubtype,
           contextTags: [],
           riskFlags: [],
-          // Track record defaults — historical performance data requires a
-          // separate data source (Yahoo Finance, etc.) which is planned for V3.
           historicalAlpha: 5.0,
           historicalWinRate: 52,
           historicalTradeCount: 5,
           recentPerformance: "Neutral recent performance",
-          explanation: `Real SEC EDGAR Form 4 filing. ${parsed.tradeType} of $${parsed.tradeSize.toLocaleString()} by ${parsed.rptOwnerName} (${parsed.role}). Track record scores use neutral defaults until historical performance data is connected in Version 3.`,
-        };
+          explanation:
+            `Live SEC EDGAR Form 4 filing. ${parsed.tradeType} of ` +
+            `$${parsed.tradeSize.toLocaleString()} in ${parsed.ticker || co.ticker} ` +
+            `by ${parsed.rptOwnerName} (${parsed.role}). ` +
+            `Filed ${daysDelayed} day${daysDelayed === 1 ? "" : "s"} after the trade date. ` +
+            `Track record scores use neutral defaults — historical ` +
+            `performance data planned for a future version.`,
+        });
 
-        results.push(entry);
+        console.log(
+          `EDGAR: ✓ ${co.ticker} — ${parsed.tradeType} $${parsed.tradeSize.toLocaleString()} by ${parsed.rptOwnerName}`,
+        );
       }
     } catch (err) {
-      // Log but never crash — site always shows data
-      console.error(`EDGAR: skipping ${co.ticker}:`, err);
+      // Log but never crash — site always falls back to sample data
+      console.error(`EDGAR: error fetching ${co.ticker}:`, err);
     }
   }
 
+  console.log(`EDGAR: total signals collected: ${results.length}`);
   return results;
 }

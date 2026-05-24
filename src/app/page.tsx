@@ -174,7 +174,7 @@ export default function HomePage() {
       <section className="bg-amber-50 border-t border-amber-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <p className="text-sm text-amber-900 leading-relaxed">
-            <span className="font-semibold">Disclaimer:</span> SignalAlpha is an
+            <span className="font-semibold">Disclaimer:</span> Signal Alpha Stock is an
             educational research tool. Scores are based on public disclosure
             data and should not be interpreted as financial advice or a
             recommendation to buy or sell securities.

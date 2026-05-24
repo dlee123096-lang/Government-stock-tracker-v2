@@ -7,7 +7,7 @@ import {
 
 const SENATE_EFD = "https://efts.senate.gov/v1";
 const USER_AGENT =
-  "SignalAlpha/3.0 (Educational research tool; https://github.com/dlee123096-lang/Government-stock-tracker-v2)";
+  "SignalAlphaStock/3.0 (Educational research tool; https://signal-alpha-stock.vercel.app)";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
