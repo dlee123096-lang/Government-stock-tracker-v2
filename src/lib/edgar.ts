@@ -12,8 +12,12 @@ interface WatchedCompany {
   company: string;
 }
 
-// Top tech / finance companies to watch for open-market insider Form 4 filings
+// Companies to watch for open-market insider Form 4 filings.
+// Mix of mega-cap tech (heavy on sells) + energy, financials, healthcare,
+// defense, and consumer (more likely to show insider buys).
+// CIK lookup: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=TICKER
 export const WATCHED_COMPANIES: WatchedCompany[] = [
+  // --- Tech ---
   { ticker: "NVDA", cik: "0001045810", company: "NVIDIA Corp." },
   { ticker: "AMD",  cik: "0000002488", company: "Advanced Micro Devices Inc." },
   { ticker: "AAPL", cik: "0000320193", company: "Apple Inc." },
@@ -25,11 +29,31 @@ export const WATCHED_COMPANIES: WatchedCompany[] = [
   { ticker: "AVGO", cik: "0001730168", company: "Broadcom Inc." },
   { ticker: "QCOM", cik: "0000804328", company: "Qualcomm Inc." },
   { ticker: "TSLA", cik: "0001318605", company: "Tesla Inc." },
-  { ticker: "JPM",  cik: "0000019617", company: "JPMorgan Chase & Co." },
   { ticker: "SMCI", cik: "0001375365", company: "Super Micro Computer Inc." },
   { ticker: "DELL", cik: "0000826083", company: "Dell Technologies Inc." },
   { ticker: "CRM",  cik: "0001108524", company: "Salesforce Inc." },
   { ticker: "INTC", cik: "0000050863", company: "Intel Corp." },
+  // --- Financials ---
+  { ticker: "JPM",  cik: "0000019617", company: "JPMorgan Chase & Co." },
+  { ticker: "WFC",  cik: "0000072971", company: "Wells Fargo & Co." },
+  { ticker: "GS",   cik: "0000886982", company: "Goldman Sachs Group Inc." },
+  { ticker: "MS",   cik: "0000895421", company: "Morgan Stanley" },
+  // BRK.B — EDGAR uses dot notation; the CIK mismatch guard normalises it
+  { ticker: "BRK.B",cik: "0001067983", company: "Berkshire Hathaway Inc." },
+  // --- Energy ---
+  { ticker: "CVX",  cik: "0000093410", company: "Chevron Corp." },
+  { ticker: "OXY",  cik: "0000797468", company: "Occidental Petroleum Corp." },
+  // --- Healthcare ---
+  { ticker: "JNJ",  cik: "0000200406", company: "Johnson & Johnson" },
+  { ticker: "UNH",  cik: "0000731766", company: "UnitedHealth Group Inc." },
+  { ticker: "PFE",  cik: "0000078003", company: "Pfizer Inc." },
+  { ticker: "ABT",  cik: "0000001800", company: "Abbott Laboratories" },
+  // --- Defense ---
+  { ticker: "LMT",  cik: "0000936468", company: "Lockheed Martin Corp." },
+  { ticker: "RTX",  cik: "0000101829", company: "RTX Corp." },
+  // --- Consumer / Retail ---
+  { ticker: "WMT",  cik: "0000104169", company: "Walmart Inc." },
+  { ticker: "HD",   cik: "0000354950", company: "Home Depot Inc." },
 ];
 
 // -- XML helpers ----------------------------------------------------------
@@ -222,7 +246,7 @@ export async function fetchEdgarSignals(): Promise<SignalEntry[]> {
   const results: SignalEntry[] = [];
 
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
+  cutoff.setDate(cutoff.getDate() - 60); // 60-day window increases buy coverage
   const cutoffStr = cutoff.toISOString().split("T")[0];
 
   for (const co of WATCHED_COMPANIES) {
@@ -254,11 +278,11 @@ export async function fetchEdgarSignals(): Promise<SignalEntry[]> {
       }
 
       console.log(
-        `EDGAR: ${co.ticker} — ${indices.length} Form 4(s) found, processing up to 3`,
+        `EDGAR: ${co.ticker} — ${indices.length} Form 4(s) found, processing up to 5`,
       );
 
-      // Process at most 3 most-recent Form 4s per company
-      for (const idx of indices.slice(0, 3)) {
+      // Process at most 5 most-recent Form 4s per company
+      for (const idx of indices.slice(0, 5)) {
         await delay(110); // Stay well under SEC's 10 req/sec fair-access limit
 
         const cikNum = stripLeadingZeros(co.cik);
@@ -283,6 +307,16 @@ export async function fetchEdgarSignals(): Promise<SignalEntry[]> {
 
         if (!parsed) {
           // Filtered out (non-P/S code, zero price, small trade, etc.)
+          continue;
+        }
+
+        // Sanity-check: if the XML ticker doesn't match what we expected,
+        // the CIK in WATCHED_COMPANIES is probably wrong. Log and skip rather
+        // than attributing another company's trade to the wrong ticker.
+        if (parsed.ticker && parsed.ticker.toUpperCase() !== co.ticker.toUpperCase()) {
+          console.warn(
+            `EDGAR: CIK ${co.cik} returned ticker ${parsed.ticker} (expected ${co.ticker}) — update WATCHED_COMPANIES`,
+          );
           continue;
         }
 
