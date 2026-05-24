@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ScoreBadge from "@/components/ScoreBadge";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
+import StockChart from "@/components/StockChart";
 import { computedSignals as mockComputedSignals } from "@/data/mockSignals";
 import { getSignals } from "@/data/liveSignals";
 import { OFFICIALS } from "@/data/committees";
@@ -120,6 +121,15 @@ export default async function SignalDetailPage({ params }: PageProps) {
             value={`${signal.historicalWinRate}%`}
           />
         </div>
+      </div>
+
+      {/* Stock price chart */}
+      <div className="mt-6">
+        <StockChart
+          ticker={signal.ticker}
+          tradeDate={signal.tradeDate}
+          tradeType={signal.tradeType === "Buy" ? "Buy" : "Sell"}
+        />
       </div>
 
       {/* Committee info for government officials */}

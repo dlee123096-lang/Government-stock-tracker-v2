@@ -12,10 +12,29 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           <Link
             href="/"
-            className="flex items-center gap-2 font-bold text-lg text-gray-900"
+            className="flex items-center gap-2.5 font-bold text-lg text-slate-900"
           >
-            <span className="inline-block w-6 h-6 rounded bg-gradient-to-br from-blue-600 to-purple-600" />
-            SignalAlpha
+            <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="logo-g" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#2563EB" />
+                  <stop offset="100%" stopColor="#7C3AED" />
+                </linearGradient>
+              </defs>
+              <rect width="32" height="32" rx="8" fill="url(#logo-g)" />
+              <path
+                d="M4,24 L8,18 L12,21 L17,11 L21,15 L26,8"
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <circle cx="17" cy="11" r="3" fill="white" />
+            </svg>
+            <span>
+              Signal<span className="text-blue-600">Alpha</span>
+            </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
