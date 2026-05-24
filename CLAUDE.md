@@ -13,17 +13,21 @@ npm run lint      # ESLint check
 
 There are no tests. `npm run build` is the verification step before every commit.
 
+On Windows: if `npm run build` fails with `EINVAL: invalid argument, readlink`, delete the `.next` folder first: `cmd /c "rmdir /s /q .next"` (PowerShell's `Remove-Item` fails on Next.js symlinks under OneDrive).
+
 ## Architecture
 
 ### Data pipeline (two live sources + fallback)
 
 At build/request time, `src/app/dashboard/page.tsx` calls `getSignals()` from `src/data/liveSignals.ts`, which runs two sources concurrently via `Promise.allSettled`:
 
-1. **EDGAR** — `fetchEdgarSignals()` in `src/lib/edgar.ts` fetches real SEC Form 4 filings for 16 watched companies. Returns `SignalEntry[]` with `signalType: "Corporate Insider"`.
+1. **EDGAR** — `fetchEdgarSignals()` in `src/lib/edgar.ts` fetches real SEC Form 4 filings for ~30 watched companies across tech, financials, energy, healthcare, defense, and consumer sectors. Returns `SignalEntry[]` with `signalType: "Corporate Insider"`.
 2. **Congress** — `fetchCongressSignals()` in `src/lib/congress.ts` hits the Senate eFD API (`efts.senate.gov/v1/filings?filing_type=PT`) for Periodic Transaction Reports; fetches individual filing details for up to 15 recent filings and parses transaction JSON. Returns `SignalEntry[]` with `signalType: "Government Official"`.
 3. **Fallback** — if combined results < 5 entries, falls back to `computedSignals` from `src/data/mockSignals.ts`. `isLive: false`. One source failing never kills the other.
 
-The dashboard page passes `{ signals, lastUpdated, isLive }` down. `lastUpdated` is `new Date().toISOString()` captured at build/request time and rendered in the dashboard header as a live/sample badge + timestamp.
+`getSignals()` is wrapped in `unstable_cache` (key `"signal-alpha-live-signals"`, TTL 4 hours) so the 100+ sequential SEC API calls only fire once per cache window — not on every page load. The dashboard page is therefore rendered statically (`○`) and ISR-refreshed. The daily GitHub Actions rebuild at 07:00 UTC also busts this cache by triggering a fresh Vercel deploy.
+
+The dashboard page passes `{ signals, lastUpdated, isLive }` down. `lastUpdated` is `new Date().toISOString()` captured at the time the cache is populated and rendered in the dashboard header as a live/sample badge + timestamp.
 
 ### Scoring engine (`src/lib/scoring.ts`)
 
@@ -90,11 +94,14 @@ Now `async`. Fast path: checks `mockComputedSignals` first (pre-generated at bui
 
 ### EDGAR client (`src/lib/edgar.ts`)
 
-- Requires `User-Agent` header on every request (SEC policy).
-- Uses a 110ms delay between filing fetches to stay under the 10 req/sec rate limit.
-- `parseForm4XML()` uses regex extraction — fragile by design to avoid adding an XML parser dependency. Only processes transaction codes `P` (purchase) and `S` (sale); skips awards, option exercises, zero-price grants, and trades under $5,000.
+- Requires `User-Agent` header on every request (SEC policy). 110ms delay between XML fetches keeps requests under the 10 req/sec fair-access limit.
+- **60-day lookback**, up to **5 Form 4s per company**. Large-cap tech insiders almost exclusively sell RSUs; the broader sector mix (energy, healthcare, defense, consumer) increases buy-signal coverage.
+- **`extractXmlValue(xml, tag)`** — two-step extraction: first grabs the full block between `<tag>` and `</tag>` (handles multi-line content), then looks for a `<value>` child element, falling back to plain text. The original single-line regex failed on EDGAR's actual format: `<tag>\n  <value>X</value>\n  <footnoteId/>\n</tag>`. Always use this function for Form 4 field extraction — never write a one-shot regex for a field that may have footnotes.
+- **`parseForm4XML()`** only processes transaction codes `P` (open-market purchase) and `S` (sale); skips awards (A), option exercises (M), tax-withholding dispositions (F), and trades under $5,000 or with zero price.
+- **`fetchFilingXml()`** strips the `xslF345X06/` XSLT viewer prefix from `primaryDocument` before constructing the archive URL — that prefix points to the HTML-rendered view, not the raw XML.
+- **CIK mismatch guard**: after parsing, if the XML's `issuerTradingSymbol` doesn't match `co.ticker`, the filing is skipped and a `console.warn` fires. This catches wrong CIKs immediately (previously caught SMCI→SYK and DVA inside BRK.B). Berkshire Hathaway uses `BRK.B` (dot, not hyphen) in EDGAR — the ticker in `WATCHED_COMPANIES` must match EDGAR's notation exactly.
 - CIK format: submissions URL uses 10-digit zero-padded CIK (`CIK0001045810`); archives URL uses the CIK without leading zeros (`1045810`).
-- To add a new watched company, append to `WATCHED_COMPANIES` in `edgar.ts` with the correct 10-digit CIK from `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=TICKER&CIK=&type=4`.
+- To add a watched company: look up the **issuer** CIK (not the insider's CIK) at `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=TICKER&CIK=&type=4`, then append to `WATCHED_COMPANIES`. Always verify by checking the first build log — if the mismatch guard fires, the CIK is wrong.
 
 ### Client/server boundary
 
@@ -131,5 +138,5 @@ Page files (`app/*/page.tsx`) are server components — `dashboard/page.tsx` is 
 - **V2**: live EDGAR Form 4 insider data (`src/lib/edgar.ts` + `src/data/liveSignals.ts`)
 - **V3**: Congress STOCK Act disclosures via Senate eFD API + committee relevance scoring + official profile pages
 - **V4**: Bloomberg-lite UI refresh — summary cards, expandable rows, muted Buy/Sell badges, mobile card layout
-- **V5**: SVG logo + favicon, SEO metadata, Yahoo Finance stock price charts on signal detail pages ← current
+- **V5**: SVG logo + favicon, SEO metadata, Yahoo Finance stock price charts on signal detail pages; live EDGAR data fixed (extractXmlValue rewrite, CIK mismatch guard, xslF345X06 prefix strip, unstable_cache, expanded company list) ← current
 - **V6+**: 13F/13D hedge fund data, watchlists, email alerts, backtesting — do not implement without explicit instruction.
